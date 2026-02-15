@@ -112,10 +112,10 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
     setWonGift(picked.name);
     setHasSpun(true);
     setIsSpinning(false);
-    await addWinnerToAdminLogs(nickname, passcode, picked.name, score);
+    if (isTop3) await addWinnerToAdminLogs(nickname, passcode, picked.name, score);
   };
 
-  const showWheel = isTop3 === true && gifts.length > 0;
+  const showWheel = gifts.length > 0;
   const showThankYou = !showWheel;
 
   return (
@@ -136,7 +136,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
         </div>
       </div>
 
-      {isTop3 === null && (
+      {!showWheel && (
         <div className="relative z-10 glass-panel p-16 rounded-[5rem] animate-pulse">
           <p className="text-pink-600 font-bold">加载中...</p>
         </div>
@@ -144,7 +144,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
 
       {showWheel && !hasSpun && (
         <div className="relative z-10 glass-panel p-12 rounded-[3rem] border-8 border-white/60 shadow-2xl max-w-lg">
-          <h2 className="text-3xl font-black candy-text mb-6">🎉 恭喜进入前三！抽奖领礼物</h2>
+          <h2 className="text-3xl font-black candy-text mb-6">🎉 抽奖领礼物</h2>
           <div className="relative w-64 h-64 mx-auto mb-8">
             <div
               className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10 w-0 h-0 border-l-[16px] border-r-[16px] border-t-[28px] border-l-transparent border-r-transparent border-t-pink-500"
@@ -178,7 +178,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
         <div className="relative z-10 glass-panel p-12 rounded-[3rem] border-8 border-amber-200 shadow-2xl max-w-lg animate-in fade-in zoom-in duration-500">
           <h2 className="text-4xl font-black candy-text mb-4">🎊 恭喜获得</h2>
           <p className="text-3xl font-black text-amber-600 mb-8">{wonGift}</p>
-          <p className="text-pink-500 text-sm mb-6">已同步到中奖记录</p>
+          {isTop3 && <p className="text-pink-500 text-sm mb-6">已同步到中奖记录</p>}
           <button onClick={onBack} className="bubble-btn px-16 py-4 bg-pink-400 text-white rounded-full text-xl font-bold shadow-xl border-4 border-white">
             完成并登出
           </button>
