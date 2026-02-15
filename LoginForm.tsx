@@ -70,7 +70,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
       <div className="text-center mb-10">
         <div className="inline-block mb-4">
           {logoUrl ? (
-            <img src={logoUrl} alt="" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
+            <img src={logoUrl} alt="" className="w-28 h-28 sm:w-36 sm:h-36 object-contain drop-shadow-md" />
           ) : (
             <span className="text-6xl drop-shadow-md">🍭</span>
           )}
