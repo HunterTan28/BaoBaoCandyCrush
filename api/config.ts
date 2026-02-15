@@ -189,7 +189,7 @@ const DEFAULT_APPEARANCE: AppearanceConfig = {
 function loadAppearanceFromStorage(): AppearanceConfig {
   try {
     const raw = localStorage.getItem(APPEARANCE_KEY);
-    if (!raw) return DEFAULT_APPEARANCE;
+    if (!raw) return { ...DEFAULT_APPEARANCE };
     const parsed = JSON.parse(raw);
     return {
       backgroundUrl: typeof parsed?.backgroundUrl === 'string' ? parsed.backgroundUrl : '',
@@ -198,7 +198,7 @@ function loadAppearanceFromStorage(): AppearanceConfig {
       logoUrl: typeof parsed?.logoUrl === 'string' ? parsed.logoUrl : '',
     };
   } catch {
-    return DEFAULT_APPEARANCE;
+    return { ...DEFAULT_APPEARANCE };
   }
 }
 
@@ -210,17 +210,13 @@ export function subscribeToAppearance(callback: (cfg: AppearanceConfig) => void)
       const configRef = ref(database, CONFIG_APPEARANCE_KEY);
       const unsubscribe = onValue(configRef, (snapshot) => {
         const val = snapshot.val();
-        let cfg: AppearanceConfig = DEFAULT_APPEARANCE;
+        const local = loadAppearanceFromStorage();
+        let cfg: AppearanceConfig = { ...local };
         if (val && typeof val === 'object') {
-          cfg = {
-            backgroundUrl: typeof val.backgroundUrl === 'string' ? val.backgroundUrl : '',
-            tileImages: Array.isArray(val.tileImages) ? val.tileImages.slice(0, 8) : [],
-            endMusicUrl: typeof val.endMusicUrl === 'string' ? val.endMusicUrl : '',
-            logoUrl: typeof val.logoUrl === 'string' ? val.logoUrl : '',
-          };
-        }
-        if (!cfg.backgroundUrl && !cfg.tileImages?.length && !cfg.endMusicUrl && !cfg.logoUrl) {
-          cfg = loadAppearanceFromStorage();
+          if (typeof val.backgroundUrl === 'string' && val.backgroundUrl) cfg.backgroundUrl = val.backgroundUrl;
+          if (Array.isArray(val.tileImages) && val.tileImages.length) cfg.tileImages = val.tileImages.slice(0, 8);
+          if (typeof val.endMusicUrl === 'string' && val.endMusicUrl) cfg.endMusicUrl = val.endMusicUrl;
+          if (typeof val.logoUrl === 'string' && val.logoUrl) cfg.logoUrl = val.logoUrl;
         }
         callback(cfg);
       });

@@ -40,6 +40,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [saveStatus, setSaveStatus] = useState('');
   const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const bgInputRef = useRef<HTMLInputElement | null>(null);
+  const musicInputRef = useRef<HTMLInputElement | null>(null);
   const tileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -253,15 +255,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
             <div className="space-y-3">
               <label className="text-pink-600 font-bold">顶部棒棒糖图标</label>
-              <p className="text-sm text-pink-500">支持图片 URL 或上传（含 GIF 动图）</p>
+              <p className="text-sm text-pink-500">上传图片或动图（支持 GIF）</p>
               <div className="flex flex-wrap items-center gap-4">
-                <input
-                  type="url"
-                  value={typeof appearance.logoUrl === 'string' && !appearance.logoUrl.startsWith('data:') ? appearance.logoUrl : ''}
-                  onChange={(e) => setAppearance({ ...appearance, logoUrl: e.target.value })}
-                  placeholder="https://example.com/logo.gif 或上传文件"
-                  className="flex-1 min-w-[200px] px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200"
-                />
                 <input
                   ref={logoInputRef}
                   type="file"
@@ -286,14 +281,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
             </div>
 
             <div className="space-y-3">
-              <label className="text-pink-600 font-bold">背景图 URL</label>
-              <input
-                type="url"
-                value={appearance.backgroundUrl}
-                onChange={(e) => setAppearance({ ...appearance, backgroundUrl: e.target.value })}
-                placeholder="https://example.com/bg.jpg 留空使用默认"
-                className="w-full px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200"
-              />
+              <label className="text-pink-600 font-bold">背景图</label>
+              <p className="text-sm text-pink-500">上传背景图片</p>
+              <div className="flex items-center gap-4">
+                <input
+                  ref={bgInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f && f.type.startsWith('image/')) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setAppearance({ ...appearance, backgroundUrl: reader.result as string });
+                        setSaveStatus('背景图已更新');
+                        setTimeout(() => setSaveStatus(''), 2000);
+                      };
+                      reader.readAsDataURL(f);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <button type="button" onClick={() => bgInputRef.current?.click()} className="bubble-btn px-6 py-3 bg-pink-400 text-white rounded-full font-bold">上传背景图</button>
+                {appearance.backgroundUrl && (
+                  <button type="button" onClick={() => setAppearance({ ...appearance, backgroundUrl: '' })} className="px-4 py-2 bg-rose-400 text-white rounded-full text-sm font-bold">恢复默认</button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -341,14 +355,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
             </div>
 
             <div className="space-y-3">
-              <label className="text-pink-600 font-bold">结束页音乐 URL</label>
-              <input
-                type="url"
-                value={appearance.endMusicUrl}
-                onChange={(e) => setAppearance({ ...appearance, endMusicUrl: e.target.value })}
-                placeholder="https://example.com/music.mp3 留空使用默认"
-                className="w-full px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200"
-              />
+              <label className="text-pink-600 font-bold">结束页音乐</label>
+              <p className="text-sm text-pink-500">上传 MP3 等音频文件</p>
+              <div className="flex items-center gap-4">
+                <input
+                  ref={musicInputRef}
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f && f.type.startsWith('audio/')) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setAppearance({ ...appearance, endMusicUrl: reader.result as string });
+                        setSaveStatus('结束音乐已更新');
+                        setTimeout(() => setSaveStatus(''), 2000);
+                      };
+                      reader.readAsDataURL(f);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <button type="button" onClick={() => musicInputRef.current?.click()} className="bubble-btn px-6 py-3 bg-pink-400 text-white rounded-full font-bold">上传音乐</button>
+                {appearance.endMusicUrl && (
+                  <button type="button" onClick={() => setAppearance({ ...appearance, endMusicUrl: '' })} className="px-4 py-2 bg-rose-400 text-white rounded-full text-sm font-bold">恢复默认</button>
+                )}
+              </div>
             </div>
 
             <button onClick={handleSaveAppearance} className="bubble-btn px-10 py-3 bg-violet-500 text-white rounded-full font-bold">保存外观音效</button>

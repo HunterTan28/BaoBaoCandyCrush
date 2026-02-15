@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subscribeToSecretCode, subscribeToAppearance } from './api/config';
+import { subscribeToSecretCode, subscribeToAppearance, getAppearanceSync } from './api/config';
 
 interface LoginFormProps {
   onLoginSuccess: (nickname: string, passcode: string) => void;
@@ -23,7 +23,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
   }, []);
 
   useEffect(() => {
-    const unsub = subscribeToAppearance((cfg) => setLogoUrl(cfg.logoUrl || ''));
+    const cfg = getAppearanceSync();
+    if (cfg.logoUrl) setLogoUrl(cfg.logoUrl);
+    const unsub = subscribeToAppearance((c) => setLogoUrl(c.logoUrl || ''));
     return unsub;
   }, []);
 
