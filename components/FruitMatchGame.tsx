@@ -388,8 +388,6 @@ const FruitMatchGame: React.FC<{
       if (top3.length === 0) return;
       const gifts: { name: string }[] = JSON.parse(localStorage.getItem('app_gifts') || '[]');
       const defaultGifts = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
-      const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
-        JSON.parse(localStorage.getItem('app_logs') || '[]');
       const roomKey = passcode.trim();
       const now = new Date().toLocaleString();
       const newEntries = top3.map((entry, i) => ({
@@ -399,8 +397,7 @@ const FruitMatchGame: React.FC<{
         timestamp: now,
         score: entry.score,
       }));
-      const filtered = logs.filter((l) => l.passcode !== roomKey);
-      localStorage.setItem('app_logs', JSON.stringify([...filtered, ...newEntries]));
+      localStorage.setItem('app_logs', JSON.stringify(newEntries));
       await saveTop3ToAdminCloud(passcode, top3, gifts);
     };
     run();

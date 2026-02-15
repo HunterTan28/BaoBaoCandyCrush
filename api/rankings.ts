@@ -125,12 +125,16 @@ export async function saveTop3ToAdminCloud(
   }));
 
   const adminLogsRef = ref(database, 'admin_logs');
-  const snapshot = await get(adminLogsRef);
-  const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
-    snapshot.val() || [];
-  const filtered = logs.filter((l) => l.passcode !== roomKey);
-  const merged = [...filtered, ...entries];
-  await set(adminLogsRef, merged);
+  await set(adminLogsRef, entries);
+}
+
+/** 清空云端中奖记录（Firebase 已配置时） */
+export async function clearAdminLogs(): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  const database = getFirebaseDb();
+  if (!database) return;
+  const adminLogsRef = ref(database, 'admin_logs');
+  await set(adminLogsRef, []);
 }
 
 export interface AdminLogEntry {

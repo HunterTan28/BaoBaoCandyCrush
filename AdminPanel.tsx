@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subscribeToAdminLogs } from './api/rankings';
+import { subscribeToAdminLogs, clearAdminLogs } from './api/rankings';
 import { subscribeToSecretCode, saveSecretCodeToCloud } from './api/config';
 
 interface Gift {
@@ -99,6 +99,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     setTimeout(() => setSaveStatus(''), 4000);
   };
 
+  /** 清空中奖记录（Firebase + localStorage） */
+  const handleClearLogs = async () => {
+    if (!confirm('确定要清空全部中奖记录吗？此操作不可恢复。')) return;
+    localStorage.removeItem('app_logs');
+    await clearAdminLogs();
+    setLogs([]);
+    setSaveStatus('已清空中奖记录');
+    setTimeout(() => setSaveStatus(''), 3000);
+  };
+
   /** 重置所有赛期：清除 session_start_*，玩家即可重新「开始竞技冲榜」 */
   const handleResetSessions = () => {
     const keysToRemove: string[] = [];
@@ -155,14 +165,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
         {activeTab === 'logs' && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-sky-600">中奖名单（当前暗号：{secretCode || '—'}）</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold text-sky-600">中奖名单（仅保留最新一批）</h3>
+              <button type="button" onClick={handleClearLogs} className="bubble-btn px-6 py-2 bg-rose-400 text-white rounded-full font-bold text-sm hover:bg-rose-500">清空中奖记录</button>
+            </div>
             <div className="bg-white/60 rounded-3xl p-6">
                <table className="w-full text-left">
                   <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>昵称</th><th>暗号</th><th>礼物</th><th>分数</th><th>时间</th></tr></thead>
                   <tbody>
-                    {logs
-                      .filter((log) => (secretCode || '').trim() && log.passcode === (secretCode || '').trim())
-                      .map((log, i) => (
+                    {logs.map((log, i) => (
                         <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
                       ))}
                   </tbody>
