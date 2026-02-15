@@ -6,6 +6,7 @@ import { cropImageToSquare } from './utils/imageCrop';
 interface Gift {
   id: string;
   name: string;
+  probability: number;
 }
 
 interface Log {
@@ -25,6 +26,7 @@ const DEFAULT_THANK_YOU = "感谢宝宝在诛仙世界浮生若梦服，积极�
 const GET_DEFAULT_GIFTS = (): Gift[] => Array.from({ length: 8 }, (_, i) => ({
   id: `g${i}`,
   name: i === 0 ? "超级巨无霸甜品" : `糖果礼物 ${i + 1}`,
+  probability: i < 4 ? 12 : 13,
 }));
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
@@ -79,8 +81,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   };
 
   const handleSaveGifts = () => {
-    saveGiftsToCloud(gifts);
-    setSaveStatus('礼物清单已保存并同步到全服');
+    const sum = gifts.reduce((s, g) => s + (Number(g.probability) || 0), 0);
+    if (Math.abs(sum - 100) > 0.01) {
+      setSaveStatus(`概率总和必须为 100%，当前为 ${sum}%`);
+      setTimeout(() => setSaveStatus(''), 4000);
+      return;
+    }
+    try {
+      saveGiftsToCloud(gifts);
+      setSaveStatus('礼物清单已保存并同步到全服');
+    } catch (e) {
+      setSaveStatus(e instanceof Error ? e.message : '保存失败');
+    }
     setTimeout(() => setSaveStatus(''), 3000);
   };
 
@@ -205,10 +217,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
       <div className="flex-1 overflow-y-auto p-8 bg-white/30">
         {activeTab === 'gifts' && (
           <div className="space-y-6 max-w-2xl">
-            <p className="text-pink-600 font-bold">8 个礼物选项，前三名将随机从中抽取（可重复中奖）</p>
+            <p className="text-pink-600 font-bold">8 个礼物选项，前三名抽奖转盘从中抽取。每个礼物的概率（%）总和必须为 100。</p>
             <div className="space-y-3">
               {gifts.map((gift, i) => (
-                <div key={gift.id} className="flex items-center gap-4">
+                <div key={gift.id} className="flex items-center gap-4 flex-wrap">
                   <span className="w-8 text-pink-500 font-bold">{i + 1}.</span>
                   <input
                     type="text"
@@ -218,12 +230,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                       next[i] = { ...next[i], name: e.target.value };
                       setGifts(next);
                     }}
-                    className="flex-1 px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200 focus:border-pink-300"
+                    className="flex-1 min-w-[140px] px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200 focus:border-pink-300"
                     placeholder={`礼物 ${i + 1}`}
                   />
+                  <label className="flex items-center gap-2">
+                    <span className="text-pink-500 font-bold text-sm">概率%</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={gift.probability ?? 12}
+                      onChange={(e) => {
+                        const next = [...gifts];
+                        next[i] = { ...next[i], probability: Math.max(0, Math.min(100, Number(e.target.value) || 0)) };
+                        setGifts(next);
+                      }}
+                      className="w-16 px-3 py-2 bg-white/80 border-2 border-pink-100 rounded-xl text-pink-600 font-bold focus:outline-none"
+                    />
+                  </label>
                 </div>
               ))}
             </div>
+            <p className="text-sm text-pink-500">当前概率总和: {gifts.reduce((s, g) => s + (Number(g.probability) || 0), 0)}%</p>
             <button onClick={handleSaveGifts} className="bubble-btn px-10 py-3 bg-pink-400 text-white rounded-full font-bold">保存配置</button>
           </div>
         )}

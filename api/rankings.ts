@@ -137,6 +137,43 @@ export async function saveTop3ToAdminCloud(
   await set(adminLogsRef, entries);
 }
 
+/** 将单个中奖者合并到中奖记录（用于抽奖转盘，每人独立 spin 后调用） */
+export async function addWinnerToAdminLogs(
+  nickname: string,
+  passcode: string,
+  giftName: string,
+  score: number
+): Promise<void> {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return;
+
+  const now = new Date().toLocaleString();
+  const newEntry: AdminLogEntry = { nickname, passcode: roomKey, giftName, timestamp: now, score };
+
+  const mergeAndSave = (current: AdminLogEntry[]) => {
+    const filtered = current.filter((e) => !(e.nickname === nickname && e.passcode === roomKey));
+    const merged = [...filtered, newEntry].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    localStorage.setItem('app_logs', JSON.stringify(merged));
+    return merged;
+  };
+
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const adminLogsRef = ref(database, 'admin_logs');
+      const snapshot = await get(adminLogsRef);
+      const data = snapshot.val();
+      const current: AdminLogEntry[] = Array.isArray(data) ? data : [];
+      const merged = mergeAndSave(current);
+      await set(adminLogsRef, merged);
+      return;
+    }
+  }
+  const raw = localStorage.getItem('app_logs');
+  const current: AdminLogEntry[] = raw ? JSON.parse(raw) : [];
+  mergeAndSave(current);
+}
+
 /** 清空云端中奖记录（Firebase 已配置时） */
 export async function clearAdminLogs(): Promise<void> {
   if (!isFirebaseConfigured()) return;

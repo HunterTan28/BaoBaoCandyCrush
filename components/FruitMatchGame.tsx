@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
-import { saveRankingToCloud, getTopRankingsForLogs, saveTop3ToAdminCloud } from '../api/rankings';
-import { getSessionStartTs, getGiftsForDraw, subscribeToAppearance } from '../api/config';
+import { saveRankingToCloud } from '../api/rankings';
+import { subscribeToAppearance } from '../api/config';
 
 export const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
@@ -201,7 +201,7 @@ function eliminateAndDrop(grid: Cell[][]): { grid: Cell[][]; count: number } {
 const FruitMatchGame: React.FC<{
   nickname: string;
   passcode: string;
-  onEnd: () => void;
+  onEnd: (score: number) => void;
   sessionTimeLeft: number | null;
 }> = ({ nickname, passcode, onEnd, sessionTimeLeft }) => {
   const [grid, setGrid] = useState<Cell[][]>(() => createInitialGrid());
@@ -387,35 +387,14 @@ const FruitMatchGame: React.FC<{
     localStorage.setItem(key, JSON.stringify(list.sort((a: any, b: any) => b.score - a.score)));
     saveRankingToCloud(passcode, nickname, score);
 
-    const run = async () => {
-      const sessionStartTs = await getSessionStartTs(passcode);
-      const top3 = await getTopRankingsForLogs(passcode, 3, { name: nickname, score }, sessionStartTs);
-      if (top3.length === 0) return;
-      const giftsForDraw = await getGiftsForDraw();
-      const giftPool = giftsForDraw.filter((g) => g?.name?.trim()).map((g) => g.name);
-      const fallback = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
-      const pool = giftPool.length > 0 ? giftPool : fallback;
-      const pickedGifts = top3.map(() => pool[Math.floor(Math.random() * pool.length)] ?? '糖果礼物');
-      const roomKey = passcode.trim();
-      const now = new Date().toLocaleString();
-      const newEntries = top3.map((entry, i) => ({
-        nickname: entry.name,
-        passcode: roomKey,
-        giftName: pickedGifts[i],
-        timestamp: now,
-        score: entry.score,
-      }));
-      localStorage.setItem('app_logs', JSON.stringify(newEntries));
-      await saveTop3ToAdminCloud(passcode, top3, pickedGifts);
-    };
-    run();
+    // 抽奖改为在 ThankYouPage 前三名玩家各自 spin 转盘后写入
   }, [gameState, passcode, nickname, score]);
 
   if (gameState === 'ended') {
     return (
       <div className="glass-panel p-10 rounded-3xl text-center">
         <h2 className="text-4xl font-bold candy-text mb-6">本局得分: {score}</h2>
-        <button onClick={onEnd} className="bubble-btn px-10 py-4 bg-pink-400 text-white rounded-full font-bold">
+        <button onClick={() => onEnd(score)} className="bubble-btn px-10 py-4 bg-pink-400 text-white rounded-full font-bold">
           返回大厅查看排名
         </button>
       </div>

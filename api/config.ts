@@ -78,6 +78,8 @@ const LOCAL_STORAGE_GIFTS_KEY = 'app_gifts';
 export interface GiftItem {
   id: string;
   name: string;
+  /** 抽中概率 0-100，8 个礼物总和必须为 100 */
+  probability: number;
 }
 
 /** 订阅礼物配置（Firebase 优先，否则 localStorage），返回取消订阅函数 */
@@ -85,6 +87,7 @@ export function subscribeToGifts(callback: (gifts: GiftItem[]) => void): () => v
   const defaultGifts: GiftItem[] = Array.from({ length: 8 }, (_, i) => ({
     id: `g${i}`,
     name: i === 0 ? '超级巨无霸甜品' : `糖果礼物 ${i + 1}`,
+    probability: i < 4 ? 12 : 13, // 12*4+13*4=100
   }));
 
   if (isFirebaseConfigured()) {
@@ -98,6 +101,7 @@ export function subscribeToGifts(callback: (gifts: GiftItem[]) => void): () => v
           list = val.map((g: any, i: number) => ({
             id: g?.id || `g${i}`,
             name: typeof g?.name === 'string' ? g.name.trim() || `糖果礼物 ${i + 1}` : `糖果礼物 ${i + 1}`,
+            probability: typeof g?.probability === 'number' && g.probability >= 0 ? g.probability : (i < 4 ? 12 : 13),
           }));
         }
         if (list.length === 0) {
@@ -107,7 +111,7 @@ export function subscribeToGifts(callback: (gifts: GiftItem[]) => void): () => v
             if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
           } catch {}
         }
-        list = Array.from({ length: 8 }, (_, i) => list[i] || { id: `g${i}`, name: `糖果礼物 ${i + 1}` });
+        list = Array.from({ length: 8 }, (_, i) => list[i] || { id: `g${i}`, name: `糖果礼物 ${i + 1}`, probability: i < 4 ? 12 : 13 });
         callback(list);
       });
       return () => off(configRef);
@@ -117,7 +121,7 @@ export function subscribeToGifts(callback: (gifts: GiftItem[]) => void): () => v
     const raw = localStorage.getItem(LOCAL_STORAGE_GIFTS_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     const list = Array.isArray(parsed) ? parsed : [];
-    const padded = Array.from({ length: 8 }, (_, i) => list[i] ? { id: list[i].id || `g${i}`, name: list[i].name } : defaultGifts[i]);
+    const padded = Array.from({ length: 8 }, (_, i) => list[i] ? { id: list[i].id || `g${i}`, name: list[i].name, probability: list[i].probability ?? (i < 4 ? 12 : 13) } : defaultGifts[i]);
     callback(padded);
   } catch {
     callback(defaultGifts);
@@ -125,9 +129,17 @@ export function subscribeToGifts(callback: (gifts: GiftItem[]) => void): () => v
   return () => {};
 }
 
-/** 保存礼物配置到云端，同时写入 localStorage */
+/** 保存礼物配置到云端，同时写入 localStorage。概率总和必须为 100，否则抛出错误。 */
 export function saveGiftsToCloud(gifts: GiftItem[]): void {
-  const list = gifts.slice(0, 8).map((g, i) => ({ id: g.id || `g${i}`, name: (g.name || '').trim() || `糖果礼物 ${i + 1}` }));
+  const list = gifts.slice(0, 8).map((g, i) => ({
+    id: g.id || `g${i}`,
+    name: (g.name || '').trim() || `糖果礼物 ${i + 1}`,
+    probability: Math.max(0, Math.min(100, Number(g.probability) || 0)),
+  }));
+  const sum = list.reduce((s, g) => s + g.probability, 0);
+  if (Math.abs(sum - 100) > 0.01) {
+    throw new Error(`概率总和必须为 100%，当前为 ${sum}%`);
+  }
   localStorage.setItem(LOCAL_STORAGE_GIFTS_KEY, JSON.stringify(list));
 
   if (!isFirebaseConfigured()) return;
@@ -137,17 +149,33 @@ export function saveGiftsToCloud(gifts: GiftItem[]): void {
   set(configRef, list).catch(() => {});
 }
 
-/** 获取礼物配置（用于抽奖，优先 Firebase） */
-export async function getGiftsForDraw(): Promise<{ name: string }[]> {
-  const defaultGiftNames = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
+export interface GiftForDraw {
+  name: string;
+  probability: number;
+}
+
+/** 获取礼物配置（用于抽奖，含概率，优先 Firebase） */
+export async function getGiftsForDraw(): Promise<GiftForDraw[]> {
+  const defaultGifts: GiftForDraw[] = [
+    { name: '超级巨无霸甜品', probability: 12 },
+    { name: '糖果礼物 2', probability: 12 },
+    { name: '糖果礼物 3', probability: 12 },
+    { name: '糖果礼物 4', probability: 12 },
+    { name: '糖果礼物 5', probability: 13 },
+    { name: '糖果礼物 6', probability: 13 },
+    { name: '糖果礼物 7', probability: 13 },
+    { name: '糖果礼物 8', probability: 13 },
+  ];
 
   const fromLocal = localStorage.getItem(LOCAL_STORAGE_GIFTS_KEY);
   if (fromLocal) {
     try {
       const parsed = JSON.parse(fromLocal) as GiftItem[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const names = parsed.filter((g) => g?.name?.trim()).map((g) => g.name);
-        if (names.length > 0) return names.map((n) => ({ name: n }));
+        const items = parsed
+          .filter((g) => g?.name?.trim() && (g.probability ?? 0) >= 0)
+          .map((g) => ({ name: g.name!.trim(), probability: g.probability ?? 0 }));
+        if (items.length > 0) return items;
       }
     } catch {}
   }
@@ -160,12 +188,14 @@ export async function getGiftsForDraw(): Promise<{ name: string }[]> {
       const snapshot = await get(configRef);
       const val = snapshot.val();
       if (Array.isArray(val) && val.length > 0) {
-        const names = val.filter((g: any) => g?.name).map((g: any) => ({ name: String(g.name) }));
-        if (names.length > 0) return names;
+        const items = val
+          .filter((g: any) => g?.name)
+          .map((g: any) => ({ name: String(g.name).trim(), probability: typeof g.probability === 'number' && g.probability >= 0 ? g.probability : 12 }));
+        if (items.length > 0) return items;
       }
     }
   }
-  return defaultGiftNames.map((n) => ({ name: n }));
+  return defaultGifts;
 }
 
 // 外观音效配置

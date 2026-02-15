@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<{ nickname: string; passcode: string } | null>(null);
   const [gameState, setGameState] = useState<'login' | 'dashboard' | 'playing' | 'finished' | 'admin'>('login');
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
+  const [finalScore, setFinalScore] = useState<number>(0);
 
   useEffect(() => {
     const unsub = subscribeToAppearance((cfg) => {
@@ -71,12 +72,19 @@ const App: React.FC = () => {
         {gameState === 'playing' && user && (
           <FruitMatchGame 
             {...user} 
-            onEnd={() => setGameState('finished')} 
+            onEnd={(score) => { setFinalScore(score); setGameState('finished'); }} 
             sessionTimeLeft={sessionTimeLeft}
           />
         )}
 
-        {gameState === 'finished' && <ThankYouPage onBack={() => setGameState('login')} />}
+        {gameState === 'finished' && user && (
+          <ThankYouPage 
+            nickname={user.nickname} 
+            passcode={user.passcode} 
+            score={finalScore} 
+            onBack={() => setGameState('login')} 
+          />
+        )}
         
         {gameState === 'admin' && <AdminPanel onExit={() => setGameState('login')} />}
       </main>
