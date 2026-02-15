@@ -114,9 +114,18 @@ export async function saveTop3ToAdminCloud(
   const roomKey = normalizePasscode(passcode);
   if (!roomKey) return;
 
+  const byName = new Map<string, number>();
+  top3.forEach((e) => {
+    const cur = byName.get(e.name);
+    if (cur === undefined || e.score > cur) byName.set(e.name, e.score);
+  });
+  const deduped = [...byName.entries()]
+    .map(([name, score]) => ({ name, score }))
+    .sort((a, b) => b.score - a.score);
+
   const defaultGifts = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
   const now = new Date().toLocaleString();
-  const entries = top3.map((e, i) => ({
+  const entries = deduped.map((e, i) => ({
     nickname: e.name,
     passcode: roomKey,
     giftName: gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`,

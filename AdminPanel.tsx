@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { subscribeToAdminLogs, clearAdminLogs } from './api/rankings';
-import { subscribeToSecretCode, saveSecretCodeToCloud } from './api/config';
+import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud } from './api/config';
 
 interface Gift {
   id: string;
@@ -93,8 +93,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
       setTimeout(() => setSaveStatus(''), 3000);
       return;
     }
-    const key = `session_start_${secretCode.trim()}`;
-    localStorage.setItem(key, Date.now().toString());
+    saveSessionStartToCloud(secretCode.trim());
     setSaveStatus(`已开启赛期！暗号「${secretCode.trim()}」2 分钟倒计时开始，玩家可冲榜`);
     setTimeout(() => setSaveStatus(''), 4000);
   };
@@ -173,7 +172,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                <table className="w-full text-left">
                   <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>昵称</th><th>暗号</th><th>礼物</th><th>分数</th><th>时间</th></tr></thead>
                   <tbody>
-                    {logs.map((log, i) => (
+                    {[...logs]
+                      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+                      .map((log, i) => (
                         <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
                       ))}
                   </tbody>

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
 import { saveRankingToCloud, getTopRankingsForLogs, saveTop3ToAdminCloud } from '../api/rankings';
+import { getSessionStartTs } from '../api/config';
 
 const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
@@ -381,9 +382,7 @@ const FruitMatchGame: React.FC<{
     saveRankingToCloud(passcode, nickname, score);
 
     const run = async () => {
-      const sessionKey = `session_start_${passcode.trim()}`;
-      const sessionStart = localStorage.getItem(sessionKey);
-      const sessionStartTs = sessionStart ? parseInt(sessionStart, 10) : undefined;
+      const sessionStartTs = await getSessionStartTs(passcode);
       const top3 = await getTopRankingsForLogs(passcode, 3, { name: nickname, score }, sessionStartTs);
       if (top3.length === 0) return;
       const gifts: { name: string }[] = JSON.parse(localStorage.getItem('app_gifts') || '[]');

@@ -5,6 +5,13 @@
         ".read": true,
         ".write": true,
         ".validate": "newData.isString() && newData.val().length <= 50"
+      },
+      "session_starts": {
+        "$roomKey": {
+          ".read": true,
+          ".write": true,
+          ".validate": "newData.isNumber()"
+        }
       }
     },
     "rooms": {
