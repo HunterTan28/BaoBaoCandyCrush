@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { subscribeToAdminLogs } from './api/rankings';
 
 interface Gift {
   id: string;
@@ -47,15 +47,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     const savedGifts = localStorage.getItem('app_gifts');
     if (savedGifts) setGifts(JSON.parse(savedGifts));
     else setGifts(GET_DEFAULT_GIFTS());
-    
-    const savedLogs = localStorage.getItem('app_logs');
-    if (savedLogs) setLogs(JSON.parse(savedLogs));
-    
+
     const savedCode = localStorage.getItem('app_secret_code');
     if (savedCode) setSecretCode(savedCode);
 
     const savedThankYou = localStorage.getItem('app_thank_you_message');
     if (savedThankYou) setThankYouMessage(savedThankYou);
+  }, []);
+
+  // 中奖记录：Firebase 时实时订阅，否则用 localStorage
+  useEffect(() => {
+    const unsub = subscribeToAdminLogs((data) => setLogs(data));
+    return unsub;
   }, []);
 
   const handleAdminLogin = (e: React.FormEvent) => {

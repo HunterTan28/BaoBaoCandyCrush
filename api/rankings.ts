@@ -1,4 +1,4 @@
-import { ref, push, onValue, off } from 'firebase/database';
+import { ref, push, onValue, off, get, set } from 'firebase/database';
 import { getFirebaseDb, isFirebaseConfigured } from './firebase';
 
 export interface RankingEntry {
@@ -60,6 +60,101 @@ export function subscribeToRankings(
   });
 
   return () => off(rankingsRef);
+}
+
+/** 获取房间前 N 名（用于写入中奖记录），去重同一人取最高分。pending 为刚结束的本局分数，会合并进结果 */
+export async function getTopRankingsForLogs(
+  passcode: string,
+  limit: number = 3,
+  pending?: { name: string; score: number }
+): Promise<RankingEntry[]> {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return [];
+
+  let list: RankingEntry[] = [];
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const rankingsRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/rankings`);
+      const snapshot = await get(rankingsRef);
+      const data = snapshot.val();
+      if (data) list = Object.values(data) as RankingEntry[];
+    }
+  } else {
+    list = getLocalRankings(passcode);
+  }
+  if (pending) list = [...list, { name: pending.name, score: pending.score, time: '' }];
+
+  const byName = new Map<string, number>();
+  list.forEach((e) => {
+    const cur = byName.get(e.name);
+    if (cur === undefined || e.score > cur) byName.set(e.name, e.score);
+  });
+  const sorted = [...byName.entries()]
+    .map(([name, score]) => ({ name, score, time: '' }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+  return sorted;
+}
+
+/** 将前 3 名写入云端 admin 中奖记录（Firebase 已配置时） */
+export async function saveTop3ToAdminCloud(
+  passcode: string,
+  top3: { name: string; score: number }[],
+  gifts: { name: string }[]
+): Promise<void> {
+  if (!isFirebaseConfigured() || top3.length === 0) return;
+  const database = getFirebaseDb();
+  if (!database) return;
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return;
+
+  const defaultGifts = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
+  const now = new Date().toLocaleString();
+  const entries = top3.map((e, i) => ({
+    nickname: e.name,
+    passcode: roomKey,
+    giftName: gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`,
+    timestamp: now,
+    score: e.score,
+  }));
+
+  const adminLogsRef = ref(database, 'admin_logs');
+  const snapshot = await get(adminLogsRef);
+  const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
+    snapshot.val() || [];
+  const filtered = logs.filter((l) => l.passcode !== roomKey);
+  const merged = [...filtered, ...entries];
+  await set(adminLogsRef, merged);
+}
+
+export interface AdminLogEntry {
+  nickname: string;
+  passcode: string;
+  giftName: string;
+  timestamp: string;
+  score: number;
+}
+
+/** 订阅 admin 中奖记录（Firebase 已配置时），返回取消函数 */
+export function subscribeToAdminLogs(callback: (logs: AdminLogEntry[]) => void): () => void {
+  if (!isFirebaseConfigured()) {
+    const raw = localStorage.getItem('app_logs');
+    callback(raw ? JSON.parse(raw) : []);
+    return () => {};
+  }
+  const database = getFirebaseDb();
+  if (!database) {
+    const raw = localStorage.getItem('app_logs');
+    callback(raw ? JSON.parse(raw) : []);
+    return () => {};
+  }
+  const adminLogsRef = ref(database, 'admin_logs');
+  const unsubscribe = onValue(adminLogsRef, (snapshot) => {
+    const data = snapshot.val();
+    callback(Array.isArray(data) ? data : []);
+  });
+  return () => off(adminLogsRef);
 }
 
 /** 获取本地排行榜（无 Firebase 时使用） */

@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
-import { saveRankingToCloud } from '../api/rankings';
+import { saveRankingToCloud, getTopRankingsForLogs, saveTop3ToAdminCloud } from '../api/rankings';
 
 const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
@@ -217,6 +217,7 @@ const FruitMatchGame: React.FC<{
   const [hintCells, setHintCells] = useState<{ r: number; c: number }[]>([]);
   const [lastActionAt, setLastActionAt] = useState(Date.now());
   const [floatingScores, setFloatingScores] = useState<{ id: string; r: number; c: number; value: number; batchId?: number }[]>([]);
+  const hasSavedOnEnd = useRef(false);
 
   const { livePlayers, isLive } = useLiveScores(passcode, nickname, score);
 
@@ -367,7 +368,11 @@ const FruitMatchGame: React.FC<{
     }, 250);
   };
 
-  if (gameState === 'ended') {
+  // 游戏结束时保存成绩 + 将前 3 名写入 admin 中奖记录（只执行一次）
+  useEffect(() => {
+    if (gameState !== 'ended' || hasSavedOnEnd.current) return;
+    hasSavedOnEnd.current = true;
+
     const key = `ranking_${passcode.trim()}`;
     const raw = localStorage.getItem(key);
     const list = raw ? JSON.parse(raw) : [];
@@ -375,6 +380,33 @@ const FruitMatchGame: React.FC<{
     localStorage.setItem(key, JSON.stringify(list.sort((a: any, b: any) => b.score - a.score)));
     saveRankingToCloud(passcode, nickname, score);
 
+    const run = async () => {
+      const top3 = await getTopRankingsForLogs(passcode, 3, { name: nickname, score });
+      if (top3.length === 0) return;
+      const gifts: { name: string }[] = JSON.parse(localStorage.getItem('app_gifts') || '[]');
+      const defaultGifts = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
+      const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
+        JSON.parse(localStorage.getItem('app_logs') || '[]');
+      const roomKey = passcode.trim();
+      const filtered = logs.filter((l) => l.passcode !== roomKey);
+      const now = new Date().toLocaleString();
+      top3.forEach((entry, i) => {
+        const giftName = gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`;
+        filtered.push({
+          nickname: entry.name,
+          passcode: roomKey,
+          giftName,
+          timestamp: now,
+          score: entry.score,
+        });
+      });
+      localStorage.setItem('app_logs', JSON.stringify(filtered));
+      await saveTop3ToAdminCloud(passcode, top3, gifts);
+    };
+    run();
+  }, [gameState, passcode, nickname, score]);
+
+  if (gameState === 'ended') {
     return (
       <div className="glass-panel p-10 rounded-3xl text-center">
         <h2 className="text-4xl font-bold candy-text mb-6">本局得分: {score}</h2>
