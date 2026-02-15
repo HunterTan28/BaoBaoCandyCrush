@@ -1,6 +1,10 @@
 {
   "rules": {
     "config": {
+      "gifts": {
+        ".read": true,
+        ".write": true
+      },
       "secret_code": {
         ".read": true,
         ".write": true,

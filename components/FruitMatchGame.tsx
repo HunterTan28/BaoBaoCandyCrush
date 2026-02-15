@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
 import { saveRankingToCloud, getTopRankingsForLogs, saveTop3ToAdminCloud } from '../api/rankings';
-import { getSessionStartTs } from '../api/config';
+import { getSessionStartTs, getGiftsForDraw } from '../api/config';
 
 const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
@@ -385,19 +385,22 @@ const FruitMatchGame: React.FC<{
       const sessionStartTs = await getSessionStartTs(passcode);
       const top3 = await getTopRankingsForLogs(passcode, 3, { name: nickname, score }, sessionStartTs);
       if (top3.length === 0) return;
-      const gifts: { name: string }[] = JSON.parse(localStorage.getItem('app_gifts') || '[]');
-      const defaultGifts = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
+      const giftsForDraw = await getGiftsForDraw();
+      const giftPool = giftsForDraw.filter((g) => g?.name?.trim()).map((g) => g.name);
+      const fallback = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
+      const pool = giftPool.length > 0 ? giftPool : fallback;
+      const pickedGifts = top3.map(() => pool[Math.floor(Math.random() * pool.length)] ?? '糖果礼物');
       const roomKey = passcode.trim();
       const now = new Date().toLocaleString();
       const newEntries = top3.map((entry, i) => ({
         nickname: entry.name,
         passcode: roomKey,
-        giftName: gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`,
+        giftName: pickedGifts[i],
         timestamp: now,
         score: entry.score,
       }));
       localStorage.setItem('app_logs', JSON.stringify(newEntries));
-      await saveTop3ToAdminCloud(passcode, top3, gifts);
+      await saveTop3ToAdminCloud(passcode, top3, pickedGifts);
     };
     run();
   }, [gameState, passcode, nickname, score]);

@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { subscribeToAdminLogs, clearAdminLogs } from './api/rankings';
-import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud } from './api/config';
+import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud } from './api/config';
 
 interface Gift {
   id: string;
   name: string;
-  probability: number;
-  quantity: number;
-  value: string;
 }
 
 interface Log {
@@ -24,12 +21,9 @@ interface AdminPanelProps {
 
 const DEFAULT_THANK_YOU = "感谢宝宝在诛仙世界浮生若梦服，积极参与宝宝有时差的帮派活动，为帮派建设做出贡献~未来我们一起携手做大做强再创辉煌！✨";
 
-const GET_DEFAULT_GIFTS = (): Gift[] => Array.from({ length: 15 }, (_, i) => ({
+const GET_DEFAULT_GIFTS = (): Gift[] => Array.from({ length: 8 }, (_, i) => ({
   id: `g${i}`,
   name: i === 0 ? "超级巨无霸甜品" : `糖果礼物 ${i + 1}`,
-  probability: i === 0 ? 5 : 10,
-  quantity: 100,
-  value: i === 0 ? "999" : "10"
 }));
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
@@ -45,10 +39,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [saveStatus, setSaveStatus] = useState('');
 
   useEffect(() => {
-    const savedGifts = localStorage.getItem('app_gifts');
-    if (savedGifts) setGifts(JSON.parse(savedGifts));
-    else setGifts(GET_DEFAULT_GIFTS());
+    const unsub = subscribeToGifts((data) => setGifts(data));
+    return unsub;
+  }, []);
 
+  useEffect(() => {
     const savedThankYou = localStorage.getItem('app_thank_you_message');
     if (savedThankYou) setThankYouMessage(savedThankYou);
   }, []);
@@ -74,8 +69,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   };
 
   const handleSaveGifts = () => {
-    localStorage.setItem('app_gifts', JSON.stringify(gifts));
-    setSaveStatus('礼物清单同步成功！');
+    saveGiftsToCloud(gifts);
+    setSaveStatus('礼物清单已保存并同步到全服');
     setTimeout(() => setSaveStatus(''), 3000);
   };
 
@@ -153,12 +148,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
       <div className="flex-1 overflow-y-auto p-8 bg-white/30">
         {activeTab === 'gifts' && (
-          <div className="space-y-6">
-            <button onClick={handleSaveGifts} className="bubble-btn px-10 py-3 bg-pink-400 text-white rounded-full font-bold">保存配置</button>
-            <div className="bg-white/80 rounded-[2.5rem] overflow-hidden p-4">
-               {/* 礼物编辑表格 */}
-               <p className="text-center italic opacity-60 py-20 text-pink-300">表格配置项已加载（参照之前文件）</p>
+          <div className="space-y-6 max-w-2xl">
+            <p className="text-pink-600 font-bold">8 个礼物选项，前三名将随机从中抽取（可重复中奖）</p>
+            <div className="space-y-3">
+              {gifts.map((gift, i) => (
+                <div key={gift.id} className="flex items-center gap-4">
+                  <span className="w-8 text-pink-500 font-bold">{i + 1}.</span>
+                  <input
+                    type="text"
+                    value={gift.name}
+                    onChange={(e) => {
+                      const next = [...gifts];
+                      next[i] = { ...next[i], name: e.target.value };
+                      setGifts(next);
+                    }}
+                    className="flex-1 px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200 focus:border-pink-300"
+                    placeholder={`礼物 ${i + 1}`}
+                  />
+                </div>
+              ))}
             </div>
+            <button onClick={handleSaveGifts} className="bubble-btn px-10 py-3 bg-pink-400 text-white rounded-full font-bold">保存配置</button>
           </div>
         )}
 

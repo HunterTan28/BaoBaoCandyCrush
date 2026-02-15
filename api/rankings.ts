@@ -102,11 +102,11 @@ export async function getTopRankingsForLogs(
   return sorted.slice(0, limit);
 }
 
-/** 将前 3 名写入云端 admin 中奖记录（Firebase 已配置时） */
+/** 将前 3 名写入云端 admin 中奖记录（Firebase 已配置时）。giftNames 为每人随机抽中的礼物名 */
 export async function saveTop3ToAdminCloud(
   passcode: string,
   top3: { name: string; score: number }[],
-  gifts: { name: string }[]
+  giftNames: string[]
 ): Promise<void> {
   if (!isFirebaseConfigured() || top3.length === 0) return;
   const database = getFirebaseDb();
@@ -128,7 +128,7 @@ export async function saveTop3ToAdminCloud(
   const entries = deduped.map((e, i) => ({
     nickname: e.name,
     passcode: roomKey,
-    giftName: gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`,
+    giftName: giftNames[i] ?? defaultGifts[i] ?? `第${i + 1}名`,
     timestamp: now,
     score: e.score,
   }));
