@@ -137,7 +137,148 @@ export async function saveTop3ToAdminCloud(
   await set(adminLogsRef, entries);
 }
 
-/** 将单个中奖者合并到中奖记录（用于抽奖转盘，每人独立 spin 后调用） */
+const PENDING_LOTTERY_PREFIX = 'app_pending_lottery_';
+const SESSION_DURATION_SEC = 120;
+
+export interface PendingLotteryEntry {
+  giftName: string;
+  score: number;
+}
+
+/** 保存抽奖结果到待定区（赛期结束后才写入 admin_logs） */
+export async function saveLotteryToPending(
+  nickname: string,
+  passcode: string,
+  giftName: string,
+  score: number
+): Promise<void> {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return;
+
+  const localKey = `${PENDING_LOTTERY_PREFIX}${roomKey}`;
+  const raw = localStorage.getItem(localKey);
+  const pending: Record<string, PendingLotteryEntry> = raw ? JSON.parse(raw) : {};
+  pending[nickname] = { giftName, score };
+  localStorage.setItem(localKey, JSON.stringify(pending));
+
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const refPath = `pending_lottery/${encodeURIComponent(roomKey)}/${encodeURIComponent(nickname)}`;
+      const refObj = ref(database, refPath);
+      await set(refObj, { giftName, score }).catch(() => {});
+    }
+  }
+}
+
+/** 获取待定抽奖结果 */
+export async function getPendingLottery(passcode: string): Promise<Record<string, PendingLotteryEntry>> {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return {};
+
+  let result: Record<string, PendingLotteryEntry> = {};
+  const localKey = `${PENDING_LOTTERY_PREFIX}${roomKey}`;
+  const raw = localStorage.getItem(localKey);
+  if (raw) {
+    try {
+      result = JSON.parse(raw);
+    } catch {}
+  }
+
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const refPath = ref(database, `pending_lottery/${encodeURIComponent(roomKey)}`);
+      const snapshot = await get(refPath);
+      const data = snapshot.val();
+      if (data && typeof data === 'object') {
+        const firebaseMap: Record<string, PendingLotteryEntry> = {};
+        for (const [nickname, val] of Object.entries(data)) {
+          const v = val as { giftName?: string; score?: number };
+          if (v?.giftName) firebaseMap[decodeURIComponent(nickname)] = { giftName: v.giftName, score: v.score ?? 0 };
+        }
+        result = { ...result, ...firebaseMap };
+      }
+    }
+  }
+  return result;
+}
+
+/** 将待定抽奖结果中的前 3 名合并到 admin_logs。force 为 true 时跳过赛期检查，直接从排行榜取前三 */
+export async function mergePendingToAdminLogs(passcode: string, force?: boolean): Promise<void> {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return;
+
+  let top3: { name: string; score: number; time: string }[];
+  if (force) {
+    top3 = await getTopRankingsForLogs(roomKey, 3, undefined, undefined);
+  } else {
+    const sessionStartTs = await getSessionStartTsFromConfig(roomKey);
+    if (sessionStartTs == null || sessionStartTs <= 0) return;
+    const elapsed = (Date.now() - sessionStartTs) / 1000;
+    if (elapsed < SESSION_DURATION_SEC) return;
+    top3 = await getTopRankingsForLogs(roomKey, 3, undefined, sessionStartTs);
+  }
+  const pending = await getPendingLottery(roomKey);
+  if (top3.length === 0) return;
+
+  const now = new Date().toLocaleString();
+  const entries: AdminLogEntry[] = top3.map((e) => ({
+    nickname: e.name,
+    passcode: roomKey,
+    giftName: pending[e.name]?.giftName ?? '糖果礼物',
+    timestamp: now,
+    score: e.score,
+  }));
+
+  const mergeAndSave = (current: AdminLogEntry[]) => {
+    const filtered = current.filter((e) => e.passcode !== roomKey);
+    const merged = [...filtered, ...entries].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    localStorage.setItem('app_logs', JSON.stringify(merged));
+    return merged;
+  };
+
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const adminLogsRef = ref(database, 'admin_logs');
+      const snapshot = await get(adminLogsRef);
+      const data = snapshot.val();
+      const current: AdminLogEntry[] = Array.isArray(data) ? data : [];
+      const merged = mergeAndSave(current);
+      await set(adminLogsRef, merged);
+    }
+  } else {
+    const raw = localStorage.getItem('app_logs');
+    const current: AdminLogEntry[] = raw ? JSON.parse(raw) : [];
+    mergeAndSave(current);
+  }
+}
+
+async function getSessionStartTsFromConfig(roomKey: string): Promise<number | undefined> {
+  const local = localStorage.getItem(`session_start_${roomKey}`);
+  if (local) return parseInt(local, 10) || undefined;
+  if (!isFirebaseConfigured()) return undefined;
+  const database = getFirebaseDb();
+  if (!database) return undefined;
+  const configRef = ref(database, `config/session_starts/${encodeURIComponent(roomKey)}`);
+  const snapshot = await get(configRef);
+  const val = snapshot.val();
+  return typeof val === 'number' ? val : undefined;
+}
+
+/** 获取赛期剩余秒数，0 表示已结束 */
+export function getSessionTimeLeft(passcode: string): number | null {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return null;
+  const local = localStorage.getItem(`session_start_${roomKey}`);
+  if (!local) return null;
+  const start = parseInt(local, 10) || 0;
+  const elapsed = (Date.now() - start) / 1000;
+  return Math.max(0, Math.floor(SESSION_DURATION_SEC - elapsed));
+}
+
+/** 将单个中奖者合并到中奖记录（已废弃：改用 saveLotteryToPending + mergePendingToAdminLogs） */
 export async function addWinnerToAdminLogs(
   nickname: string,
   passcode: string,
@@ -189,6 +330,23 @@ export interface AdminLogEntry {
   giftName: string;
   timestamp: string;
   score: number;
+}
+
+/** 直接从数据库/本地读取中奖记录（用于刷新按钮） */
+export async function fetchAdminLogs(): Promise<AdminLogEntry[]> {
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const adminLogsRef = ref(database, 'admin_logs');
+      const snapshot = await get(adminLogsRef);
+      const data = snapshot.val();
+      const list = Array.isArray(data) ? data : [];
+      localStorage.setItem('app_logs', JSON.stringify(list));
+      return list;
+    }
+  }
+  const raw = localStorage.getItem('app_logs');
+  return raw ? JSON.parse(raw) : [];
 }
 
 /** 订阅 admin 中奖记录（Firebase 已配置时），返回取消函数 */

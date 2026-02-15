@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAppearance, getGiftsForDraw, getSessionStartTs, type GiftForDraw } from './api/config';
-import { getTopRankingsForLogs, addWinnerToAdminLogs } from './api/rankings';
+import { getTopRankingsForLogs, saveLotteryToPending } from './api/rankings';
 
 const DEFAULT_MUSIC_URL = '/bkmusic.mp3';
 
@@ -112,7 +112,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
     setWonGift(picked.name);
     setHasSpun(true);
     setIsSpinning(false);
-    if (isTop3) await addWinnerToAdminLogs(nickname, passcode, picked.name, score);
+    await saveLotteryToPending(nickname, passcode, picked.name, score);
   };
 
   const showWheel = gifts.length > 0;
@@ -178,7 +178,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
         <div className="relative z-10 glass-panel p-12 rounded-[3rem] border-8 border-amber-200 shadow-2xl max-w-lg animate-in fade-in zoom-in duration-500">
           <h2 className="text-4xl font-black candy-text mb-4">🎊 恭喜获得</h2>
           <p className="text-3xl font-black text-amber-600 mb-8">{wonGift}</p>
-          {isTop3 && <p className="text-pink-500 text-sm mb-6">已同步到中奖记录</p>}
+          {isTop3 && <p className="text-pink-500 text-sm mb-6">已记录，赛期结束后更新中奖名单</p>}
           <button onClick={onBack} className="bubble-btn px-16 py-4 bg-pink-400 text-white rounded-full text-xl font-bold shadow-xl border-4 border-white">
             完成并登出
           </button>

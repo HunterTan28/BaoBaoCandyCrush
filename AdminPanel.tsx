@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { subscribeToAdminLogs, clearAdminLogs } from './api/rankings';
+import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs } from './api/rankings';
 import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, type AppearanceConfig } from './api/config';
 import { cropImageToSquare } from './utils/imageCrop';
 
@@ -40,6 +40,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [secretCode, setSecretCode] = useState('宝宝');
   const [thankYouMessage, setThankYouMessage] = useState(DEFAULT_THANK_YOU);
   const [saveStatus, setSaveStatus] = useState('');
+  const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
   const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const bgInputRef = useRef<HTMLInputElement | null>(null);
@@ -70,6 +71,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     const unsub = subscribeToAppearance((cfg) => setAppearance(cfg));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'logs') return;
+    const tick = () => {
+      const left = getSessionTimeLeft(secretCode);
+      setSessionTimeLeft(left);
+      if (left === 0) mergePendingToAdminLogs(secretCode).catch(() => {});
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [activeTab, secretCode]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,22 +271,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
         {activeTab === 'logs' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-2xl font-bold text-sky-600">中奖名单（仅保留最新一批）</h3>
-              <button type="button" onClick={handleClearLogs} className="bubble-btn px-6 py-2 bg-rose-400 text-white rounded-full font-bold text-sm hover:bg-rose-500">清空中奖记录</button>
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <h3 className="text-2xl font-bold text-sky-600">中奖名单（赛期结束后更新）</h3>
+              <div className="flex gap-3">
+                <button type="button" onClick={async () => { await mergePendingToAdminLogs(secretCode, true); const data = await fetchAdminLogs(); setLogs(data); setSaveStatus('已刷新'); setTimeout(() => setSaveStatus(''), 2000); }} className="bubble-btn px-6 py-2 bg-sky-400 text-white rounded-full font-bold text-sm hover:bg-sky-500">🔄 刷新</button>
+                <button type="button" onClick={handleClearLogs} className="bubble-btn px-6 py-2 bg-rose-400 text-white rounded-full font-bold text-sm hover:bg-rose-500">清空中奖记录</button>
+              </div>
             </div>
-            <div className="bg-white/60 rounded-3xl p-6">
-               <table className="w-full text-left">
-                  <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>昵称</th><th>暗号</th><th>礼物</th><th>分数</th><th>时间</th></tr></thead>
-                  <tbody>
-                    {[...logs]
-                      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-                      .map((log, i) => (
-                        <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
-                      ))}
-                  </tbody>
-               </table>
-            </div>
+            {sessionTimeLeft !== null && sessionTimeLeft > 0 ? (
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-3xl p-8 text-center">
+                <p className="text-amber-600 font-bold text-lg mb-2">赛期进行中</p>
+                <p className="text-4xl font-black text-amber-500 tabular-nums">{sessionTimeLeft} 秒</p>
+                <p className="text-amber-500 text-sm mt-2">距离截止后更新中奖记录</p>
+              </div>
+            ) : (
+              <div className="bg-white/60 rounded-3xl p-6">
+                 <table className="w-full text-left">
+                    <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>昵称</th><th>暗号</th><th>礼物</th><th>分数</th><th>时间</th></tr></thead>
+                    <tbody>
+                      {[...logs]
+                        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+                        .map((log, i) => (
+                          <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
+                        ))}
+                    </tbody>
+                 </table>
+              </div>
+            )}
           </div>
         )}
 
