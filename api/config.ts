@@ -179,11 +179,16 @@ export interface AppearanceConfig {
   logoUrl: string;
 }
 
+/** 内置默认资源路径（需将图片放入 public 目录） */
+const BUILTIN_DEFAULTS = {
+  backgroundUrl: '/bg.png',
+  logoUrl: '/logo.gif',
+  tileImages: ['/logo.gif', '/icon-photoroom.png', '/logo.gif', '/icon-photoroom.png', '/logo.gif', '/icon-photoroom.png', '/logo.gif', '/icon-photoroom.png'] as string[],
+  endMusicUrl: '/bkmusic.mp3',
+};
+
 const DEFAULT_APPEARANCE: AppearanceConfig = {
-  backgroundUrl: '',
-  tileImages: [],
-  endMusicUrl: '',
-  logoUrl: '',
+  ...BUILTIN_DEFAULTS,
 };
 
 function loadAppearanceFromStorage(): AppearanceConfig {
@@ -191,11 +196,17 @@ function loadAppearanceFromStorage(): AppearanceConfig {
     const raw = localStorage.getItem(APPEARANCE_KEY);
     if (!raw) return { ...DEFAULT_APPEARANCE };
     const parsed = JSON.parse(raw);
-    return {
+    const loaded: AppearanceConfig = {
       backgroundUrl: typeof parsed?.backgroundUrl === 'string' ? parsed.backgroundUrl : '',
       tileImages: Array.isArray(parsed?.tileImages) ? parsed.tileImages.slice(0, 8) : [],
       endMusicUrl: typeof parsed?.endMusicUrl === 'string' ? parsed.endMusicUrl : '',
       logoUrl: typeof parsed?.logoUrl === 'string' ? parsed.logoUrl : '',
+    };
+    return {
+      backgroundUrl: loaded.backgroundUrl || BUILTIN_DEFAULTS.backgroundUrl,
+      tileImages: loaded.tileImages.length ? loaded.tileImages : BUILTIN_DEFAULTS.tileImages,
+      endMusicUrl: loaded.endMusicUrl || BUILTIN_DEFAULTS.endMusicUrl,
+      logoUrl: loaded.logoUrl || BUILTIN_DEFAULTS.logoUrl,
     };
   } catch {
     return { ...DEFAULT_APPEARANCE };
@@ -214,9 +225,12 @@ export function subscribeToAppearance(callback: (cfg: AppearanceConfig) => void)
         let cfg: AppearanceConfig = { ...local };
         if (val && typeof val === 'object') {
           if (typeof val.backgroundUrl === 'string' && val.backgroundUrl) cfg.backgroundUrl = val.backgroundUrl;
+          else cfg.backgroundUrl = cfg.backgroundUrl || BUILTIN_DEFAULTS.backgroundUrl;
           if (Array.isArray(val.tileImages) && val.tileImages.length) cfg.tileImages = val.tileImages.slice(0, 8);
+          else cfg.tileImages = (cfg.tileImages?.length ? cfg.tileImages : BUILTIN_DEFAULTS.tileImages).slice(0, 8);
           if (typeof val.endMusicUrl === 'string' && val.endMusicUrl) cfg.endMusicUrl = val.endMusicUrl;
           if (typeof val.logoUrl === 'string' && val.logoUrl) cfg.logoUrl = val.logoUrl;
+          else cfg.logoUrl = cfg.logoUrl || BUILTIN_DEFAULTS.logoUrl;
         }
         callback(cfg);
       });

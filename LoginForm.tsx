@@ -24,8 +24,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
 
   useEffect(() => {
     const cfg = getAppearanceSync();
-    if (cfg.logoUrl) setLogoUrl(cfg.logoUrl);
-    const unsub = subscribeToAppearance((c) => setLogoUrl(c.logoUrl || ''));
+    setLogoUrl(cfg.logoUrl?.trim() || '/logo.gif');
+    const unsub = subscribeToAppearance((c) => setLogoUrl(c.logoUrl?.trim() || '/logo.gif'));
     return unsub;
   }, []);
 
@@ -68,7 +68,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
   return (
     <div className={`glass-panel w-full max-w-md p-10 rounded-[3rem] transition-all duration-500 transform ${isShake ? 'animate-vibrate' : 'scale-100'} hover:shadow-[0_25px_60px_rgba(255,105,180,0.4)]`}>
       <div className="text-center mb-10">
-        <div className="inline-block mb-4 animate-bounce">
+        <div className="inline-block mb-4">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
           ) : (

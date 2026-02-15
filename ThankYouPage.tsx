@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAppearance } from './api/config';
 
-const DEFAULT_MUSIC_URL = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+const DEFAULT_MUSIC_URL = '/bkmusic.mp3';
 
 interface ThankYouPageProps {
   onBack: () => void;
@@ -82,12 +82,20 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ onBack }) => {
           </div>
         </div>
 
-        <button 
-          onClick={onBack}
-          className="mt-12 bubble-btn px-20 py-6 bg-pink-400 text-white rounded-full text-2xl font-bold shadow-xl border-4 border-white"
-        >
-          完成并登出
-        </button>
+        <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <button 
+            onClick={toggleMute}
+            className="px-8 py-4 bg-white/80 rounded-full text-lg font-bold shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+          >
+            {isMuted ? '🔇 点击恢复音乐' : '🔊 点击静音'}
+          </button>
+          <button 
+            onClick={onBack}
+            className="bubble-btn px-20 py-6 bg-pink-400 text-white rounded-full text-2xl font-bold shadow-xl border-4 border-white"
+          >
+            完成并登出
+          </button>
+        </div>
       </div>
 
       {/* 底部装饰 */}

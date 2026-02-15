@@ -19,7 +19,7 @@ const App: React.FC = () => {
         document.body.style.backgroundPosition = 'center';
         document.body.style.backgroundAttachment = 'fixed';
       } else {
-        document.body.style.backgroundImage = "linear-gradient(135deg, rgba(255, 222, 233, 0.6) 0%, rgba(181, 255, 252, 0.6) 100%), url('https://images.unsplash.com/photo-1534073828943-f801091bb18c?auto=format&fit=crop&q=80&w=1920')";
+        document.body.style.backgroundImage = "linear-gradient(135deg, rgba(255, 222, 233, 0.6) 0%, rgba(181, 255, 252, 0.6) 100%), url('/bg.png')";
         document.body.style.backgroundSize = 'cover';
         document.body.style.backgroundPosition = 'center';
         document.body.style.backgroundAttachment = 'fixed';
