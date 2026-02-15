@@ -155,27 +155,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
         {activeTab === 'logs' && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-sky-600">中奖名单（仅当前赛季）</h3>
+            <h3 className="text-2xl font-bold text-sky-600">中奖名单（当前暗号：{secretCode || '—'}）</h3>
             <div className="bg-white/60 rounded-3xl p-6">
                <table className="w-full text-left">
                   <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>昵称</th><th>暗号</th><th>礼物</th><th>分数</th><th>时间</th></tr></thead>
                   <tbody>
-                    {((): Log[] => {
-                      const byPasscode = new Map<string, AdminLogEntry[]>();
-                      for (const log of logs) {
-                        const arr = byPasscode.get(log.passcode) ?? [];
-                        arr.push(log);
-                        byPasscode.set(log.passcode, arr);
-                      }
-                      const result: Log[] = [];
-                      byPasscode.forEach((arr) => {
-                        const maxTs = Math.max(...arr.map((l) => new Date(l.timestamp || 0).getTime()));
-                        arr.filter((l) => new Date(l.timestamp || 0).getTime() === maxTs).forEach((l) => result.push(l));
-                      });
-                      return result.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
-                    })().map((log, i) => (
-                      <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
-                    ))}
+                    {logs
+                      .filter((log) => (secretCode || '').trim() && log.passcode === (secretCode || '').trim())
+                      .map((log, i) => (
+                        <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
+                      ))}
                   </tbody>
                </table>
             </div>

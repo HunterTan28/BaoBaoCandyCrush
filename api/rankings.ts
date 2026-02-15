@@ -128,7 +128,8 @@ export async function saveTop3ToAdminCloud(
   const snapshot = await get(adminLogsRef);
   const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
     snapshot.val() || [];
-  const merged = [...logs, ...entries];
+  const filtered = logs.filter((l) => l.passcode !== roomKey);
+  const merged = [...filtered, ...entries];
   await set(adminLogsRef, merged);
 }
 

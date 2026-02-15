@@ -399,7 +399,8 @@ const FruitMatchGame: React.FC<{
         timestamp: now,
         score: entry.score,
       }));
-      localStorage.setItem('app_logs', JSON.stringify([...logs, ...newEntries]));
+      const filtered = logs.filter((l) => l.passcode !== roomKey);
+      localStorage.setItem('app_logs', JSON.stringify([...filtered, ...newEntries]));
       await saveTop3ToAdminCloud(passcode, top3, gifts);
     };
     run();
