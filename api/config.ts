@@ -183,7 +183,7 @@ export interface AppearanceConfig {
 const BUILTIN_DEFAULTS = {
   backgroundUrl: '/bg.png',
   logoUrl: '/logo.gif',
-  tileImages: ['/logo.gif', '/icon-photoroom.png', '/logo.gif', '/icon-photoroom.png', '/logo.gif', '/icon-photoroom.png', '/logo.gif', '/icon-photoroom.png'] as string[],
+  tileImages: [] as string[],
   endMusicUrl: '/bkmusic.mp3',
 };
 
