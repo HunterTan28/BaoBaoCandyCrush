@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import LoginForm from './components/LoginForm';
+import LoginForm from './LoginForm';
 import Dashboard from './components/Dashboard';
 import FruitMatchGame from './components/FruitMatchGame';
-import AdminPanel from './components/AdminPanel';
-import ThankYouPage from './components/ThankYouPage';
+import AdminPanel from './AdminPanel';
+import ThankYouPage from './ThankYouPage';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ nickname: string; passcode: string } | null>(null);
