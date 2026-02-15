@@ -9,7 +9,8 @@ export interface PlayerScore {
 }
 
 const CLIENT_ID_KEY = 'candy_client_id';
-const LIVE_TIMEOUT_MS = 15000;
+const LIVE_TIMEOUT_MS = 20000;
+const WRITE_INTERVAL_MS = 1000;
 
 function getClientId(): string {
   let id = sessionStorage.getItem(CLIENT_ID_KEY);
@@ -20,34 +21,39 @@ function getClientId(): string {
   return id;
 }
 
+function normalizePasscode(p: string): string {
+  return (p || '').trim();
+}
+
 export function useLiveScores(passcode: string, nickname: string, myScore: number) {
   const [livePlayers, setLivePlayers] = useState<PlayerScore[]>([]);
   const [isLive, setIsLive] = useState(false);
   const useFirebase = isFirebaseConfigured();
   const clientId = getClientId();
+  const roomKey = normalizePasscode(passcode);
 
-  // Firebase: 写入自己的分数
+  // Firebase: 写入自己的分数（每 1 秒同步，保证同一房间可见）
   useEffect(() => {
-    if (!useFirebase) return;
+    if (!useFirebase || !roomKey) return;
     const database = getFirebaseDb();
     if (!database) return;
 
-    const playerRef = ref(database, `rooms/${encodeURIComponent(passcode)}/players/${clientId}`);
+    const playerRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/players/${clientId}`);
     const payload = { name: nickname, score: myScore, lastUpdate: Date.now() };
 
     const write = () => set(playerRef, payload);
     write();
-    const interval = setInterval(write, 2000);
+    const interval = setInterval(write, WRITE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [useFirebase, passcode, nickname, myScore, clientId]);
+  }, [useFirebase, roomKey, nickname, myScore, clientId]);
 
   // Firebase: 监听房间内所有玩家
   useEffect(() => {
-    if (!useFirebase) return;
+    if (!useFirebase || !roomKey) return;
     const database = getFirebaseDb();
     if (!database) return;
 
-    const roomRef = ref(database, `rooms/${encodeURIComponent(passcode)}/players`);
+    const roomRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/players`);
     const unsubscribe = onValue(roomRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) {
@@ -71,14 +77,14 @@ export function useLiveScores(passcode: string, nickname: string, myScore: numbe
       setIsLive(list.length > 1);
     });
     return () => off(roomRef);
-  }, [useFirebase, passcode, clientId]);
+  }, [useFirebase, roomKey, clientId]);
 
   // localStorage 回退：无 Firebase 时
   useEffect(() => {
     if (useFirebase) return;
 
     const interval = setInterval(() => {
-      const storageKey = `live_room_${passcode}`;
+      const storageKey = `live_room_${roomKey}`;
       const players = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
       const meIndex = players.findIndex((p: any) => p.name === nickname);
@@ -105,7 +111,7 @@ export function useLiveScores(passcode: string, nickname: string, myScore: numbe
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [useFirebase, passcode, nickname, myScore]);
+  }, [useFirebase, roomKey, nickname, myScore]);
 
   return { livePlayers, isLive };
 }

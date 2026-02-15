@@ -133,7 +133,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         <button onClick={() => setActiveTab('gifts')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'gifts' ? 'bg-pink-400 text-white' : 'text-pink-300'}`}>礼物配置</button>
         <button onClick={() => setActiveTab('logs')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'logs' ? 'bg-sky-400 text-white' : 'text-sky-300'}`}>中奖记录</button>
         <button onClick={() => setActiveTab('settings')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'settings' ? 'bg-pink-500 text-white' : 'text-pink-300'}`}>基本设置</button>
-        <button onClick={() => setActiveTab('sync')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-indigo-300'}`}>全服同步(必看)</button>
+        <button onClick={() => setActiveTab('sync')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-indigo-300'}`}>全服同步</button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 bg-white/30">
@@ -164,33 +164,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         )}
 
         {activeTab === 'sync' && (
-          <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
-             <div className="bg-indigo-50 p-10 rounded-[3rem] border-4 border-indigo-100">
-                <h3 className="text-indigo-600 font-black text-3xl mb-6">🌐 如何实现真正的全服竞技？</h3>
-                <div className="space-y-6 text-indigo-800 leading-relaxed">
-                   <p className="font-bold">目前您看到的多人竞技是“模拟效果”，为了让身处不同地点、不同服务器的宝宝真正互动，您需要以下操作：</p>
-                   <div className="bg-white/60 p-6 rounded-2xl space-y-4 shadow-inner">
-                      <div className="flex items-start gap-4">
-                         <div className="bg-indigo-500 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">1</div>
-                         <p><strong>接入云端数据库：</strong> 建议将前端代码部署到 Vercel/Netlify，并接入 <strong>Firebase Realtime Database</strong>。它是实时同步分数的最快方案。</p>
-                      </div>
-                      <div className="flex items-start gap-4">
-                         <div className="bg-indigo-500 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">2</div>
-                         <p><strong>Socket 通信：</strong> 在游戏中添加 <code className="bg-indigo-100 px-2 rounded">socket.emit('score_update', score)</code> 语句，实时广播玩家操作。</p>
-                      </div>
-                      <div className="flex items-start gap-4">
-                         <div className="bg-indigo-500 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">3</div>
-                         <p><strong>统一暗号验证：</strong> 将所有玩家的分数存储在数据库中以 <code className="bg-indigo-100 px-2 rounded">passcode</code> 为 Key 的节点下，实现真正的房间同步。</p>
-                      </div>
-                   </div>
-                   <p className="text-sm italic opacity-70">如果您需要我帮您编写 Firebase 接入代码，请随时告知！✨</p>
+          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in">
+            <div className="bg-white/80 rounded-3xl p-8 shadow-lg border-2 border-indigo-100">
+              <h3 className="text-indigo-600 font-bold text-xl mb-6">全服实时同步</h3>
+              <div className="space-y-4 text-indigo-800">
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-200">
+                  <span className="text-2xl">✓</span>
+                  <div>
+                    <p className="font-bold text-green-800">已接入 Firebase Realtime Database</p>
+                    <p className="text-sm text-green-700">同一暗号下的玩家可实时看到彼此分数</p>
+                  </div>
                 </div>
-             </div>
-             
-             <div className="bg-amber-50 p-8 rounded-[3rem] border-4 border-amber-100 text-amber-900">
-                <h4 className="font-bold mb-2">💡 临时同步小妙招：</h4>
-                <p className="text-sm">在活动期间，让管理员每 5 分钟刷新一次后台，将“中奖记录”截图发到 YY 频道或微信群，也是一种低成本的“手动同步”方式哦！</p>
-             </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-indigo-50 rounded-xl">
+                    <p className="font-bold text-indigo-700 text-sm mb-1">实时榜单</p>
+                    <p className="text-sm text-indigo-600">游戏中右侧显示本局所有在线玩家分数，每 2 秒同步</p>
+                  </div>
+                  <div className="p-4 bg-indigo-50 rounded-xl">
+                    <p className="font-bold text-indigo-700 text-sm mb-1">历史排行榜</p>
+                    <p className="text-sm text-indigo-600">每局结束后成绩写入云端，大厅展示前 5 名</p>
+                  </div>
+                </div>
+                <p className="text-sm text-indigo-600 pt-2">玩家使用相同暗号进入游戏即可自动加入同一房间，无需额外配置。</p>
+              </div>
+            </div>
           </div>
         )}
 

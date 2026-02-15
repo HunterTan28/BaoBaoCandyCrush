@@ -7,13 +7,13 @@ import { saveRankingToCloud } from '../api/rankings';
 const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
 const COLS = 8;
-const GAME_DURATION = 90;
+const GAME_DURATION = 30;
 const SCORE_PER_TILE = 10;
 const BONUS_4 = 5;   // 四连每格额外 +5
 const BONUS_5 = 10;  // 五连每格额外 +10
 const COMBO_MULTIPLIER = 0.5; // 连击每层 +50% 分数
 const SHUFFLE_LIMIT = 3;
-const HINT_IDLE_SECONDS = 10;
+const HINT_IDLE_SECONDS = 2;
 
 interface Cell {
   type: string;
@@ -250,7 +250,7 @@ const FruitMatchGame: React.FC<{
     return () => clearInterval(interval);
   }, [nickname, gameState]);
 
-  // 10 秒无操作自动提示
+  // 2 秒无操作自动提示
   useEffect(() => {
     if (gameState !== 'playing' || isAnimating) return;
     const t = setInterval(() => {
@@ -368,7 +368,7 @@ const FruitMatchGame: React.FC<{
   };
 
   if (gameState === 'ended') {
-    const key = `ranking_${passcode}`;
+    const key = `ranking_${passcode.trim()}`;
     const raw = localStorage.getItem(key);
     const list = raw ? JSON.parse(raw) : [];
     list.push({ name: nickname, score, time: new Date().toISOString() });

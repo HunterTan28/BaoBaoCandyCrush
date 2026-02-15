@@ -7,13 +7,19 @@ export interface RankingEntry {
   time: string;
 }
 
+function normalizePasscode(p: string): string {
+  return (p || '').trim();
+}
+
 /** 保存单局成绩到云端（Firebase 已配置时） */
 export function saveRankingToCloud(passcode: string, nickname: string, score: number): void {
   if (!isFirebaseConfigured()) return;
   const database = getFirebaseDb();
   if (!database) return;
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) return;
 
-  const rankingsRef = ref(database, `rooms/${encodeURIComponent(passcode)}/rankings`);
+  const rankingsRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/rankings`);
   push(rankingsRef, {
     name: nickname,
     score,
@@ -35,8 +41,13 @@ export function subscribeToRankings(
     callback([]);
     return () => {};
   }
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) {
+    callback([]);
+    return () => {};
+  }
 
-  const rankingsRef = ref(database, `rooms/${encodeURIComponent(passcode)}/rankings`);
+  const rankingsRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/rankings`);
   const unsubscribe = onValue(rankingsRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) {
@@ -53,7 +64,8 @@ export function subscribeToRankings(
 
 /** 获取本地排行榜（无 Firebase 时使用） */
 export function getLocalRankings(passcode: string): RankingEntry[] {
-  const key = `ranking_${passcode}`;
+  const roomKey = normalizePasscode(passcode);
+  const key = `ranking_${roomKey}`;
   const raw = localStorage.getItem(key);
   if (!raw) return [];
   const list = JSON.parse(raw) as RankingEntry[];

@@ -32,16 +32,17 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
       return;
     }
 
-    if (passcode !== secretCode && passcode !== TEST_PASSCODE) {
+    const trimmedPasscode = passcode.trim();
+    if (trimmedPasscode !== secretCode && trimmedPasscode !== TEST_PASSCODE) {
       handleError('暗号不对呢，小调皮~');
       return;
     }
 
-    const isTestPasscode = passcode === TEST_PASSCODE;
+    const isTestPasscode = trimmedPasscode === TEST_PASSCODE;
     if (!isTestPasscode) {
       const logs = JSON.parse(localStorage.getItem('app_logs') || '[]');
       const hasPlayed = logs.some((log: any) => 
-        log.nickname === nickname.trim() && log.passcode === passcode
+        log.nickname === nickname.trim() && log.passcode === trimmedPasscode
       );
       if (hasPlayed) {
         handleError('你已经参加过这次派对啦~');
@@ -49,7 +50,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
       }
     }
 
-    onLoginSuccess(nickname.trim(), passcode);
+    onLoginSuccess(nickname.trim(), trimmedPasscode);
   };
 
   const handleError = (msg: string) => {
