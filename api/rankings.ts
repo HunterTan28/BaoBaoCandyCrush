@@ -27,13 +27,24 @@ export function saveRankingToCloud(passcode: string, nickname: string, score: nu
   });
 }
 
-/** 从云端读取排行榜（Firebase 已配置时），返回订阅取消函数 */
+/** 从云端读取排行榜（Firebase 已配置时），返回订阅取消函数。sessionStartTs 可选，传入则只返回该赛期内的得分表。得分表保留到下个赛期开始之前（管理员开启新赛期时才切换） */
 export function subscribeToRankings(
   passcode: string,
-  callback: (list: RankingEntry[]) => void
+  callback: (list: RankingEntry[]) => void,
+  sessionStartTs?: number
 ): () => void {
   if (!isFirebaseConfigured()) {
-    callback([]);
+    const list = getLocalRankings(passcode);
+    const filtered = sessionStartTs != null && sessionStartTs > 0
+      ? list.filter((e) => e.time && new Date(e.time).getTime() >= sessionStartTs)
+      : list;
+    const byName = new Map<string, { score: number; time: string }>();
+    filtered.forEach((e) => {
+      const cur = byName.get(e.name);
+      if (!cur || e.score > cur.score) byName.set(e.name, { score: e.score, time: e.time });
+    });
+    const sorted = [...byName.entries()].map(([name, { score, time }]) => ({ name, score, time })).sort((a, b) => b.score - a.score);
+    callback(sorted);
     return () => {};
   }
   const database = getFirebaseDb();
@@ -54,8 +65,16 @@ export function subscribeToRankings(
       callback([]);
       return;
     }
-    const list = Object.values(data) as RankingEntry[];
-    const sorted = [...list].sort((a, b) => b.score - a.score).slice(0, 10);
+    let list = Object.values(data) as RankingEntry[];
+    if (sessionStartTs != null && sessionStartTs > 0) {
+      list = list.filter((e) => e.time && new Date(e.time).getTime() >= sessionStartTs);
+    }
+    const byName = new Map<string, { score: number; time: string }>();
+    list.forEach((e) => {
+      const cur = byName.get(e.name);
+      if (!cur || e.score > cur.score) byName.set(e.name, { score: e.score, time: e.time });
+    });
+    const sorted = [...byName.entries()].map(([name, { score, time }]) => ({ name, score, time })).sort((a, b) => b.score - a.score);
     callback(sorted);
   });
 
@@ -204,26 +223,28 @@ export async function getPendingLottery(passcode: string): Promise<Record<string
   return result;
 }
 
-/** 将待定抽奖结果中的前 3 名合并到 admin_logs。force 为 true 时跳过赛期检查，直接从排行榜取前三 */
+/** 将待定抽奖结果中的前 5 名合并到 admin_logs。force 为 true 时跳过赛期检查，直接从排行榜取前五 */
 export async function mergePendingToAdminLogs(passcode: string, force?: boolean): Promise<void> {
   const roomKey = normalizePasscode(passcode);
   if (!roomKey) return;
 
-  let top3: { name: string; score: number; time: string }[];
+  let top5: { name: string; score: number; time: string }[];
+  let sessionStartTs: number | undefined;
   if (force) {
-    top3 = await getTopRankingsForLogs(roomKey, 3, undefined, undefined);
+    top5 = await getTopRankingsForLogs(roomKey, 5, undefined, undefined);
   } else {
-    const sessionStartTs = await getSessionStartTsFromConfig(roomKey);
+    sessionStartTs = await getSessionStartTsFromConfig(roomKey);
     if (sessionStartTs == null || sessionStartTs <= 0) return;
     const elapsed = (Date.now() - sessionStartTs) / 1000;
     if (elapsed < SESSION_DURATION_SEC) return;
-    top3 = await getTopRankingsForLogs(roomKey, 3, undefined, sessionStartTs);
+    top5 = await getTopRankingsForLogs(roomKey, 5, undefined, sessionStartTs);
+    await saveSessionScoreTableToCloud(roomKey, sessionStartTs);
   }
   const pending = await getPendingLottery(roomKey);
-  if (top3.length === 0) return;
+  if (top5.length === 0) return;
 
   const now = new Date().toLocaleString();
-  const entries: AdminLogEntry[] = top3.map((e) => ({
+  const entries: AdminLogEntry[] = top5.map((e) => ({
     nickname: e.name,
     passcode: roomKey,
     giftName: pending[e.name]?.giftName ?? '糖果礼物',
@@ -252,6 +273,22 @@ export async function mergePendingToAdminLogs(passcode: string, force?: boolean)
     const raw = localStorage.getItem('app_logs');
     const current: AdminLogEntry[] = raw ? JSON.parse(raw) : [];
     mergeAndSave(current);
+  }
+}
+
+/** 赛期结束后将完整得分表写入数据库。该得分表保留到下个赛期开始之前（管理员开启新赛期时才被新数据替换） */
+async function saveSessionScoreTableToCloud(roomKey: string, sessionStartTs: number): Promise<void> {
+  const topAll = await getTopRankingsForLogs(roomKey, 999, undefined, sessionStartTs);
+  const scoreTable = topAll.map((e) => ({ nickname: e.name, score: e.score, time: e.time || new Date().toISOString() }));
+  const localKey = `score_table_${roomKey}_${sessionStartTs}`;
+  localStorage.setItem(localKey, JSON.stringify(scoreTable));
+
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const refPath = ref(database, `rooms/${encodeURIComponent(roomKey)}/session_score_table`);
+      await set(refPath, scoreTable).catch(() => {});
+    }
   }
 }
 

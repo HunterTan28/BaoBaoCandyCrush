@@ -230,7 +230,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
       <div className="flex-1 overflow-y-auto p-8 bg-white/30">
         {activeTab === 'gifts' && (
           <div className="space-y-6 max-w-2xl">
-            <p className="text-pink-600 font-bold">8 个礼物选项，前三名抽奖转盘从中抽取。每个礼物的概率（%）总和必须为 100。</p>
+            <p className="text-pink-600 font-bold">8 个礼物选项，前五名抽奖转盘从中抽取。每个礼物的概率（%）总和必须为 100。</p>
             <div className="space-y-3">
               {gifts.map((gift, i) => (
                 <div key={gift.id} className="flex items-center gap-4 flex-wrap">
@@ -272,7 +272,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         {activeTab === 'logs' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4">
-              <h3 className="text-2xl font-bold text-sky-600">中奖名单（赛期结束后更新）</h3>
+              <h3 className="text-2xl font-bold text-sky-600">中奖名单（从得分表前五名抽取）</h3>
               <div className="flex gap-3">
                 <button type="button" onClick={async () => { await mergePendingToAdminLogs(secretCode, true); const data = await fetchAdminLogs(); setLogs(data); setSaveStatus('已刷新'); setTimeout(() => setSaveStatus(''), 2000); }} className="bubble-btn px-6 py-2 bg-sky-400 text-white rounded-full font-bold text-sm hover:bg-sky-500">🔄 刷新</button>
                 <button type="button" onClick={handleClearLogs} className="bubble-btn px-6 py-2 bg-rose-400 text-white rounded-full font-bold text-sm hover:bg-rose-500">清空中奖记录</button>

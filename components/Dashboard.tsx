@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { generateGameContent } from '../api/gemini';
 import { subscribeToRankings, getLocalRankings } from '../api/rankings';
+import { getSessionStartTs } from '../api/config';
 import { isFirebaseConfigured } from '../api/firebase';
 
 interface DashboardProps {
@@ -18,26 +19,42 @@ const Dashboard: React.FC<DashboardProps> = ({ nickname, passcode, onLogout, onS
   const [myBest, setMyBest] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isFirebaseConfigured()) {
-      const unsubscribe = subscribeToRankings(passcode, (list) => {
-        const top5 = list.slice(0, 5).map((e) => ({ name: e.name, score: e.score }));
-        setRankList(top5);
-        const myEntries = list.filter((e) => e.name === nickname);
-        if (myEntries.length) setMyBest(Math.max(...myEntries.map((e) => e.score)));
+    let sessionStartTs: number | undefined;
+    const setup = async () => {
+      sessionStartTs = await getSessionStartTs(passcode);
+      if (isFirebaseConfigured()) {
+        return subscribeToRankings(passcode, (list) => {
+          const slice = list.slice(0, 20);
+          setRankList(slice.map((e) => ({ name: e.name, score: e.score })));
+          const myEntries = list.filter((e) => e.name === nickname);
+          if (myEntries.length) setMyBest(Math.max(...myEntries.map((e) => e.score)));
+        }, sessionStartTs);
+      }
+      const list = getLocalRankings(passcode);
+      const filtered = sessionStartTs != null && sessionStartTs > 0
+        ? list.filter((e) => e.time && new Date(e.time).getTime() >= sessionStartTs!)
+        : list;
+      const byName = new Map<string, number>();
+      filtered.forEach((e) => {
+        const cur = byName.get(e.name);
+        if (cur === undefined || e.score > cur) byName.set(e.name, e.score);
       });
-      return unsubscribe;
-    }
-    const list = getLocalRankings(passcode);
-    setRankList(list.slice(0, 5).map((e) => ({ name: e.name, score: e.score })));
-    const myEntries = list.filter((e) => e.name === nickname);
-    if (myEntries.length) setMyBest(Math.max(...myEntries.map((e) => e.score)));
+      const sorted = [...byName.entries()].map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score).slice(0, 20);
+      setRankList(sorted);
+      const myEntries = sorted.filter((e) => e.name === nickname);
+      if (myEntries.length) setMyBest(myEntries[0].score);
+      return () => {};
+    };
+    let unsub = () => {};
+    setup().then((fn) => { unsub = fn; });
+    return () => unsub();
   }, [passcode, nickname]);
 
   useEffect(() => {
     const fetchGreeting = async () => {
-      const prompt = `你是一个可爱糖果世界的引导者。现在有一位名叫 "${nickname}" 的玩家登录了。请写一段简短、甜美、激励性的欢迎辞。字数在30字以内。提到：“只有竞技前三名才有神秘礼盒哦”。`;
+      const prompt = `你是一个可爱糖果世界的引导者。现在有一位名叫 "${nickname}" 的玩家登录了。请写一段简短、甜美、激励性的欢迎辞。字数在30字以内。提到：“只有竞技前五名才有神秘礼盒哦”。`;
       const text = await generateGameContent(prompt);
-      setAiMessage(text || `欢迎 ${nickname} 回到糖果屋！只有积分排名前三的宝宝才能拿走礼盒哦，快快冲鸭！`);
+      setAiMessage(text || `欢迎 ${nickname} 回到糖果屋！积分排名前五的宝宝才能拿走礼盒哦，快快冲鸭！`);
     };
     fetchGreeting();
   }, [nickname]);
@@ -64,7 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({ nickname, passcode, onLogout, onS
       </div>
 
       <div className="mb-8 bg-white/40 p-5 rounded-3xl border-2 border-pink-100">
-        <h3 className="text-pink-500 font-bold mb-3 flex items-center justify-center gap-2">🏆 排行榜</h3>
+        <h3 className="text-pink-500 font-bold mb-3 flex items-center justify-center gap-2">🏆 得分表（本赛期）</h3>
         {rankList.length > 0 ? (
           <div className="space-y-2">
             {rankList.map((r, i) => (

@@ -68,10 +68,10 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
         return;
       }
       const sessionStartTs = await getSessionStartTs(roomKey);
-      const top3 = await getTopRankingsForLogs(roomKey, 3, { name: nickname, score }, sessionStartTs ?? undefined);
+      const top5 = await getTopRankingsForLogs(roomKey, 5, { name: nickname, score }, sessionStartTs ?? undefined);
       if (cancelled) return;
-      const rank = top3.findIndex((e) => e.name === nickname);
-      setIsTop3(rank >= 0 && rank < 3);
+      const rank = top5.findIndex((e) => e.name === nickname);
+      setIsTop3(rank >= 0 && rank < 5);
       const g = await getGiftsForDraw();
       if (!cancelled) setGifts(g.filter((x) => x.name?.trim()).length > 0 ? g : [{ name: '糖果礼物', probability: 100 }]);
     };
@@ -178,7 +178,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
         <div className="relative z-10 glass-panel p-12 rounded-[3rem] border-8 border-amber-200 shadow-2xl max-w-lg animate-in fade-in zoom-in duration-500">
           <h2 className="text-4xl font-black candy-text mb-4">🎊 恭喜获得</h2>
           <p className="text-3xl font-black text-amber-600 mb-8">{wonGift}</p>
-          {isTop3 && <p className="text-pink-500 text-sm mb-6">已记录，赛期结束后更新中奖名单</p>}
+          {isTop3 && <p className="text-pink-500 text-sm mb-6">已记录，赛期结束后更新中奖名单（前五名）</p>}
           <button onClick={onBack} className="bubble-btn px-16 py-4 bg-pink-400 text-white rounded-full text-xl font-bold shadow-xl border-4 border-white">
             完成并登出
           </button>
