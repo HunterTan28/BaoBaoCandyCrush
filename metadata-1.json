@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Lucky Baby Candy Party",
+  "description": "A candy-themed Match-4 game with full-screen experience and weighted gift chest system.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

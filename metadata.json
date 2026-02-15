@@ -1,0 +1,8 @@
+{
+  "name": "宝宝有时差 - 糖果世界",
+  "description": "一个以糖果为主题的连连看竞技游戏，包含 AI 互动、实时排行榜和加权礼盒系统。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
