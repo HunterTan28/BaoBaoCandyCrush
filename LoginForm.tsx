@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { subscribeToSecretCode } from './api/config';
+import { subscribeToSecretCode, subscribeToAppearance } from './api/config';
 
 interface LoginFormProps {
   onLoginSuccess: (nickname: string, passcode: string) => void;
@@ -15,9 +15,15 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
   const [error, setError] = useState('');
   const [isShake, setIsShake] = useState(false);
   const [secretCode, setSecretCode] = useState('宝宝');
+  const [logoUrl, setLogoUrl] = useState('');
 
   useEffect(() => {
     const unsub = subscribeToSecretCode((code) => setSecretCode(code || '宝宝'));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToAppearance((cfg) => setLogoUrl(cfg.logoUrl || ''));
     return unsub;
   }, []);
 
@@ -61,7 +67,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
     <div className={`glass-panel w-full max-w-md p-10 rounded-[3rem] transition-all duration-500 transform ${isShake ? 'animate-vibrate' : 'scale-100'} hover:shadow-[0_25px_60px_rgba(255,105,180,0.4)]`}>
       <div className="text-center mb-10">
         <div className="inline-block mb-4 animate-bounce">
-           <span className="text-6xl drop-shadow-md">🍭</span>
+          {logoUrl ? (
+            <img src={logoUrl} alt="" className="w-20 h-20 sm:w-24 sm:h-24 object-contain drop-shadow-md" />
+          ) : (
+            <span className="text-6xl drop-shadow-md">🍭</span>
+          )}
         </div>
         <h1 className="text-5xl font-bold candy-text mb-3 tracking-tighter">宝宝有时差</h1>
         <p className="text-pink-400 text-lg tracking-[0.2em] font-bold opacity-80">糖果世界 · 竞技登场</p>

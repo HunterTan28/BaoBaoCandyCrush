@@ -1,5 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { subscribeToAppearance } from './api/config';
+
+const DEFAULT_MUSIC_URL = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
 
 interface ThankYouPageProps {
   onBack: () => void;
@@ -10,22 +12,26 @@ const DEFAULT_THANK_YOU = "感谢宝宝在诛仙世界浮生若梦服，积极�
 const ThankYouPage: React.FC<ThankYouPageProps> = ({ onBack }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [customMessage, setCustomMessage] = useState(DEFAULT_THANK_YOU);
+  const [musicUrl, setMusicUrl] = useState(DEFAULT_MUSIC_URL);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // 自动播放背景音乐
+    const unsub = subscribeToAppearance((cfg) => {
+      setMusicUrl((cfg.endMusicUrl || '').trim() || DEFAULT_MUSIC_URL);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = 0.5;
-      audioRef.current.play().catch(e => {
-        console.log("Autoplay blocked, needs interaction", e);
-      });
+      audioRef.current.play().catch(() => {});
     }
+  }, [musicUrl]);
 
-    // 读取自定义感谢语
+  useEffect(() => {
     const savedMsg = localStorage.getItem('app_thank_you_message');
-    if (savedMsg) {
-      setCustomMessage(savedMsg);
-    }
+    if (savedMsg) setCustomMessage(savedMsg);
   }, []);
 
   const toggleMute = () => {
@@ -41,7 +47,7 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ onBack }) => {
       <audio 
         ref={audioRef} 
         loop 
-        src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" 
+        src={musicUrl} 
       />
       
       {/* 静音按钮 */}

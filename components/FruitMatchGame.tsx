@@ -3,9 +3,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
 import { saveRankingToCloud, getTopRankingsForLogs, saveTop3ToAdminCloud } from '../api/rankings';
-import { getSessionStartTs, getGiftsForDraw } from '../api/config';
+import { getSessionStartTs, getGiftsForDraw, subscribeToAppearance } from '../api/config';
 
-const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
+export const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
 const COLS = 8;
 const GAME_DURATION = 30;
@@ -221,6 +221,12 @@ const FruitMatchGame: React.FC<{
   const hasSavedOnEnd = useRef(false);
 
   const { livePlayers, isLive } = useLiveScores(passcode, nickname, score);
+  const [tileImages, setTileImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    const unsub = subscribeToAppearance((cfg) => setTileImages(cfg.tileImages || []));
+    return unsub;
+  }, []);
 
   const recordAction = useCallback(() => {
     setLastActionAt(Date.now());
@@ -500,7 +506,11 @@ const FruitMatchGame: React.FC<{
                     ${cell.isFalling ? 'tile-falling' : ''}
                   `}
                 >
-                  {cell.type}
+                  {tileImages[TILES.indexOf(cell.type)] ? (
+                    <img src={tileImages[TILES.indexOf(cell.type)]} alt="" className="w-full h-full object-contain" />
+                  ) : (
+                    cell.type
+                  )}
                 </div>
               );
             })

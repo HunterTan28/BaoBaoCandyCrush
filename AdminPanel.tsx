@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAdminLogs, clearAdminLogs } from './api/rankings';
-import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud } from './api/config';
+import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, type AppearanceConfig } from './api/config';
+import { cropImageToSquare } from './utils/imageCrop';
 
 interface Gift {
   id: string;
@@ -30,13 +31,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'gifts' | 'logs' | 'settings' | 'sync'>('gifts');
+  const [activeTab, setActiveTab] = useState<'gifts' | 'logs' | 'settings' | 'sync' | 'appearance'>('gifts');
   
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [secretCode, setSecretCode] = useState('宝宝');
   const [thankYouMessage, setThankYouMessage] = useState(DEFAULT_THANK_YOU);
   const [saveStatus, setSaveStatus] = useState('');
+  const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const tileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     const unsub = subscribeToGifts((data) => setGifts(data));
@@ -53,9 +57,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     return unsub;
   }, []);
 
-  // 中奖记录：Firebase 时实时订阅，否则用 localStorage
   useEffect(() => {
     const unsub = subscribeToAdminLogs((data) => setLogs(data));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToAppearance((cfg) => setAppearance(cfg));
     return unsub;
   }, []);
 
@@ -103,6 +111,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     setTimeout(() => setSaveStatus(''), 3000);
   };
 
+  const handleSaveAppearance = () => {
+    saveAppearanceToCloud(appearance);
+    setSaveStatus('外观音效已保存并同步到全服');
+    setTimeout(() => setSaveStatus(''), 3000);
+  };
+
+  const handleTileUpload = async (index: number, file: File | null) => {
+    if (!file || !file.type.startsWith('image/')) {
+      alert('请选择图片文件');
+      return;
+    }
+    try {
+      const dataUrl = await cropImageToSquare(file, 128);
+      const next = [...(appearance.tileImages || [])];
+      while (next.length <= index) next.push('');
+      next[index] = dataUrl;
+      setAppearance({ ...appearance, tileImages: next });
+      setSaveStatus(`图标 ${index + 1} 已裁剪为正方形`);
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (e) {
+      alert('图片处理失败，请重试');
+    }
+  };
+
+  const handleLogoUpload = (file: File | null) => {
+    if (!file || !file.type.startsWith('image/')) {
+      alert('请选择图片或动图（支持 GIF）');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setAppearance({ ...appearance, logoUrl: dataUrl });
+      setSaveStatus('顶部图标已更新（支持 GIF 动图）');
+      setTimeout(() => setSaveStatus(''), 2000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveTile = (index: number) => {
+    const next = [...(appearance.tileImages || [])];
+    next[index] = '';
+    setAppearance({ ...appearance, tileImages: next });
+  };
+
   /** 重置所有赛期：清除 session_start_*，玩家即可重新「开始竞技冲榜」 */
   const handleResetSessions = () => {
     const keysToRemove: string[] = [];
@@ -139,11 +192,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         </div>
       </div>
 
-      <div className="flex bg-white/20">
-        <button onClick={() => setActiveTab('gifts')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'gifts' ? 'bg-pink-400 text-white' : 'text-pink-300'}`}>礼物配置</button>
-        <button onClick={() => setActiveTab('logs')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'logs' ? 'bg-sky-400 text-white' : 'text-sky-300'}`}>中奖记录</button>
-        <button onClick={() => setActiveTab('settings')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'settings' ? 'bg-pink-500 text-white' : 'text-pink-300'}`}>基本设置</button>
-        <button onClick={() => setActiveTab('sync')} className={`flex-1 py-5 font-bold transition-all ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-indigo-300'}`}>全服同步</button>
+      <div className="flex bg-white/20 flex-wrap">
+        <button onClick={() => setActiveTab('gifts')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'gifts' ? 'bg-pink-400 text-white' : 'text-pink-300'}`}>礼物配置</button>
+        <button onClick={() => setActiveTab('logs')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'logs' ? 'bg-sky-400 text-white' : 'text-sky-300'}`}>中奖记录</button>
+        <button onClick={() => setActiveTab('settings')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'settings' ? 'bg-pink-500 text-white' : 'text-pink-300'}`}>基本设置</button>
+        <button onClick={() => setActiveTab('appearance')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'appearance' ? 'bg-violet-500 text-white' : 'text-violet-300'}`}>外观音效</button>
+        <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-indigo-300'}`}>全服同步</button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 bg-white/30">
@@ -190,6 +244,114 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                   </tbody>
                </table>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'appearance' && (
+          <div className="space-y-8 max-w-2xl">
+            <h3 className="text-2xl font-bold text-violet-600">外观与音效</h3>
+
+            <div className="space-y-3">
+              <label className="text-pink-600 font-bold">顶部棒棒糖图标</label>
+              <p className="text-sm text-pink-500">支持图片 URL 或上传（含 GIF 动图）</p>
+              <div className="flex flex-wrap items-center gap-4">
+                <input
+                  type="url"
+                  value={typeof appearance.logoUrl === 'string' && !appearance.logoUrl.startsWith('data:') ? appearance.logoUrl : ''}
+                  onChange={(e) => setAppearance({ ...appearance, logoUrl: e.target.value })}
+                  placeholder="https://example.com/logo.gif 或上传文件"
+                  className="flex-1 min-w-[200px] px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200"
+                />
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleLogoUpload(f);
+                    e.target.value = '';
+                  }}
+                />
+                <button type="button" onClick={() => logoInputRef.current?.click()} className="bubble-btn px-6 py-3 bg-pink-400 text-white rounded-full font-bold">上传图片/动图</button>
+                {appearance.logoUrl && (
+                  <button type="button" onClick={() => setAppearance({ ...appearance, logoUrl: '' })} className="px-4 py-2 bg-rose-400 text-white rounded-full text-sm font-bold">恢复默认</button>
+                )}
+              </div>
+              {appearance.logoUrl && (
+                <div className="w-24 h-24 rounded-2xl border-2 border-pink-200 bg-white/80 overflow-hidden flex items-center justify-center">
+                  <img src={appearance.logoUrl} alt="预览" className="max-w-full max-h-full object-contain" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-pink-600 font-bold">背景图 URL</label>
+              <input
+                type="url"
+                value={appearance.backgroundUrl}
+                onChange={(e) => setAppearance({ ...appearance, backgroundUrl: e.target.value })}
+                placeholder="https://example.com/bg.jpg 留空使用默认"
+                className="w-full px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200"
+              />
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-pink-600 font-bold">消消乐图标（8 个）</label>
+              <p className="text-sm text-pink-500">上传图片将自动居中裁剪为正方形，适配任意分辨率</p>
+              <div className="grid grid-cols-4 sm:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <div key={i} className="relative flex flex-col items-center">
+                    <div className="aspect-square rounded-2xl border-2 border-pink-200 bg-white/80 overflow-hidden flex items-center justify-center">
+                      {appearance.tileImages?.[i] ? (
+                        <img src={appearance.tileImages[i]} alt={`图标${i + 1}`} className="w-full h-full object-contain" />
+                      ) : (
+                        <span className="text-4xl opacity-40">🍬</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1 mt-2">
+                      <input
+                        ref={(el) => { tileInputRefs.current[i] = el; }}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleTileUpload(i, f);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => tileInputRefs.current[i]?.click()}
+                        className="flex-1 py-1 px-2 bg-pink-400 text-white text-xs rounded-lg font-bold"
+                      >上传</button>
+                      {appearance.tileImages?.[i] && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTile(i)}
+                          className="py-1 px-2 bg-rose-400 text-white text-xs rounded-lg font-bold"
+                        >删除</button>
+                      )}
+                    </div>
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-pink-400 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{i + 1}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-pink-600 font-bold">结束页音乐 URL</label>
+              <input
+                type="url"
+                value={appearance.endMusicUrl}
+                onChange={(e) => setAppearance({ ...appearance, endMusicUrl: e.target.value })}
+                placeholder="https://example.com/music.mp3 留空使用默认"
+                className="w-full px-6 py-4 bg-white/80 border-2 border-pink-100 rounded-2xl text-pink-600 font-bold focus:outline-none focus:ring-2 focus:ring-pink-200"
+              />
+            </div>
+
+            <button onClick={handleSaveAppearance} className="bubble-btn px-10 py-3 bg-violet-500 text-white rounded-full font-bold">保存外观音效</button>
           </div>
         )}
 

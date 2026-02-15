@@ -167,3 +167,87 @@ export async function getGiftsForDraw(): Promise<{ name: string }[]> {
   }
   return defaultGiftNames.map((n) => ({ name: n }));
 }
+
+// 外观音效配置
+const APPEARANCE_KEY = 'app_appearance';
+const CONFIG_APPEARANCE_KEY = 'config/appearance';
+
+export interface AppearanceConfig {
+  backgroundUrl: string;
+  tileImages: string[];
+  endMusicUrl: string;
+  logoUrl: string;
+}
+
+const DEFAULT_APPEARANCE: AppearanceConfig = {
+  backgroundUrl: '',
+  tileImages: [],
+  endMusicUrl: '',
+  logoUrl: '',
+};
+
+function loadAppearanceFromStorage(): AppearanceConfig {
+  try {
+    const raw = localStorage.getItem(APPEARANCE_KEY);
+    if (!raw) return DEFAULT_APPEARANCE;
+    const parsed = JSON.parse(raw);
+    return {
+      backgroundUrl: typeof parsed?.backgroundUrl === 'string' ? parsed.backgroundUrl : '',
+      tileImages: Array.isArray(parsed?.tileImages) ? parsed.tileImages.slice(0, 8) : [],
+      endMusicUrl: typeof parsed?.endMusicUrl === 'string' ? parsed.endMusicUrl : '',
+      logoUrl: typeof parsed?.logoUrl === 'string' ? parsed.logoUrl : '',
+    };
+  } catch {
+    return DEFAULT_APPEARANCE;
+  }
+}
+
+/** 订阅外观音效配置 */
+export function subscribeToAppearance(callback: (cfg: AppearanceConfig) => void): () => void {
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const configRef = ref(database, CONFIG_APPEARANCE_KEY);
+      const unsubscribe = onValue(configRef, (snapshot) => {
+        const val = snapshot.val();
+        let cfg: AppearanceConfig = DEFAULT_APPEARANCE;
+        if (val && typeof val === 'object') {
+          cfg = {
+            backgroundUrl: typeof val.backgroundUrl === 'string' ? val.backgroundUrl : '',
+            tileImages: Array.isArray(val.tileImages) ? val.tileImages.slice(0, 8) : [],
+            endMusicUrl: typeof val.endMusicUrl === 'string' ? val.endMusicUrl : '',
+            logoUrl: typeof val.logoUrl === 'string' ? val.logoUrl : '',
+          };
+        }
+        if (!cfg.backgroundUrl && !cfg.tileImages?.length && !cfg.endMusicUrl && !cfg.logoUrl) {
+          cfg = loadAppearanceFromStorage();
+        }
+        callback(cfg);
+      });
+      return () => off(configRef);
+    }
+  }
+  callback(loadAppearanceFromStorage());
+  return () => {};
+}
+
+/** 保存外观音效配置到云端 */
+export function saveAppearanceToCloud(cfg: AppearanceConfig): void {
+  const data = {
+    backgroundUrl: (cfg.backgroundUrl || '').trim(),
+    tileImages: (cfg.tileImages || []).slice(0, 8),
+    endMusicUrl: (cfg.endMusicUrl || '').trim(),
+    logoUrl: (cfg.logoUrl || '').trim(),
+  };
+  localStorage.setItem(APPEARANCE_KEY, JSON.stringify(data));
+  if (!isFirebaseConfigured()) return;
+  const database = getFirebaseDb();
+  if (!database) return;
+  const configRef = ref(database, CONFIG_APPEARANCE_KEY);
+  set(configRef, data).catch(() => {});
+}
+
+/** 获取外观配置（用于游戏/感谢页） */
+export function getAppearanceSync(): AppearanceConfig {
+  return loadAppearanceFromStorage();
+}

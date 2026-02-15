@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { subscribeToAppearance } from './api/config';
 import LoginForm from './LoginForm';
 import Dashboard from './components/Dashboard';
 import FruitMatchGame from './components/FruitMatchGame';
@@ -10,6 +10,23 @@ const App: React.FC = () => {
   const [user, setUser] = useState<{ nickname: string; passcode: string } | null>(null);
   const [gameState, setGameState] = useState<'login' | 'dashboard' | 'playing' | 'finished' | 'admin'>('login');
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeToAppearance((cfg) => {
+      if (cfg.backgroundUrl?.trim()) {
+        document.body.style.backgroundImage = `linear-gradient(135deg, rgba(255, 222, 233, 0.6) 0%, rgba(181, 255, 252, 0.6) 100%), url('${cfg.backgroundUrl}')`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundAttachment = 'fixed';
+      } else {
+        document.body.style.backgroundImage = "linear-gradient(135deg, rgba(255, 222, 233, 0.6) 0%, rgba(181, 255, 252, 0.6) 100%), url('https://images.unsplash.com/photo-1534073828943-f801091bb18c?auto=format&fit=crop&q=80&w=1920')";
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundPosition = 'center';
+        document.body.style.backgroundAttachment = 'fixed';
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!user || user.passcode === '测试') return;
