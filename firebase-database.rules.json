@@ -1,0 +1,33 @@
+{
+  "rules": {
+    "config": {
+      "secret_code": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.isString() && newData.val().length <= 50"
+      }
+    },
+    "rooms": {
+      "$roomKey": {
+        "players": {
+          ".read": true,
+          "$clientId": {
+            ".write": true,
+            ".validate": "newData.hasChildren(['name','score','lastUpdate']) && newData.child('name').isString() && newData.child('name').val().length <= 50 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 999999 && newData.child('lastUpdate').isNumber()"
+          }
+        },
+        "rankings": {
+          ".read": true,
+          "$pushId": {
+            ".write": true,
+            ".validate": "newData.hasChildren(['name','score','time']) && newData.child('name').isString() && newData.child('name').val().length <= 50 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 999999 && newData.child('time').isString()"
+          }
+        }
+      }
+    },
+    "admin_logs": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

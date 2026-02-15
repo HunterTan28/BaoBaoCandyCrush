@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { subscribeToSecretCode } from './api/config';
 
 interface LoginFormProps {
   onLoginSuccess: (nickname: string, passcode: string) => void;
@@ -17,10 +17,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onAdminLogin }) =
   const [secretCode, setSecretCode] = useState('宝宝');
 
   useEffect(() => {
-    const savedCode = localStorage.getItem('app_secret_code');
-    if (savedCode) {
-      setSecretCode(savedCode);
-    }
+    const unsub = subscribeToSecretCode((code) => setSecretCode(code || '宝宝'));
+    return unsub;
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {

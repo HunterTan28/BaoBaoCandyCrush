@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { subscribeToAdminLogs } from './api/rankings';
+import { subscribeToSecretCode, saveSecretCodeToCloud } from './api/config';
 
 interface Gift {
   id: string;
@@ -48,11 +49,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     if (savedGifts) setGifts(JSON.parse(savedGifts));
     else setGifts(GET_DEFAULT_GIFTS());
 
-    const savedCode = localStorage.getItem('app_secret_code');
-    if (savedCode) setSecretCode(savedCode);
-
     const savedThankYou = localStorage.getItem('app_thank_you_message');
     if (savedThankYou) setThankYouMessage(savedThankYou);
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeToSecretCode((code) => setSecretCode(code || '宝宝'));
+    return unsub;
   }, []);
 
   // 中奖记录：Firebase 时实时订阅，否则用 localStorage
@@ -77,9 +80,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   };
 
   const handleSaveSettings = () => {
-    localStorage.setItem('app_secret_code', secretCode);
+    saveSecretCodeToCloud(secretCode);
     localStorage.setItem('app_thank_you_message', thankYouMessage);
-    setSaveStatus('秘密设置已生效！');
+    setSaveStatus('秘密设置已生效！暗号已同步到全服');
     setTimeout(() => setSaveStatus(''), 3000);
   };
 
