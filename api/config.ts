@@ -12,8 +12,9 @@ export function subscribeToSecretCode(callback: (code: string) => void): () => v
       const configRef = ref(database, CONFIG_SECRET_CODE_KEY);
       const unsubscribe = onValue(configRef, (snapshot) => {
         const val = snapshot.val();
-        const code = typeof val === 'string' ? val : (val || '') || '';
-        callback(code || '');
+        const fromFirebase = typeof val === 'string' ? (val || '').trim() : '';
+        const code = fromFirebase || localStorage.getItem(LOCAL_STORAGE_KEY) || '';
+        callback(code);
       });
       return () => off(configRef);
     }
@@ -33,5 +34,7 @@ export function saveSecretCodeToCloud(code: string): void {
   if (!database) return;
 
   const configRef = ref(database, CONFIG_SECRET_CODE_KEY);
-  set(configRef, trimmed);
+  set(configRef, trimmed).catch((err) => {
+    console.warn('[Config] 暗号写入 Firebase 失败，可能未配置 config 规则:', err);
+  });
 }
