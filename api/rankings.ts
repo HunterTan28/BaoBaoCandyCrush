@@ -62,11 +62,13 @@ export function subscribeToRankings(
   return () => off(rankingsRef);
 }
 
-/** 获取房间前 N 名（用于写入中奖记录），去重同一人取最高分。pending 为刚结束的本局分数，会合并进结果 */
+/** 获取房间前 N 名（用于写入中奖记录），去重同一人取最高分。pending 为刚结束的本局分数，会合并进结果。
+ * 若传入 sessionStartTs，则只统计该赛期内的参与者，不足 N 人不补旧数据。 */
 export async function getTopRankingsForLogs(
   passcode: string,
   limit: number = 3,
-  pending?: { name: string; score: number }
+  pending?: { name: string; score: number },
+  sessionStartTs?: number
 ): Promise<RankingEntry[]> {
   const roomKey = normalizePasscode(passcode);
   if (!roomKey) return [];
@@ -83,7 +85,11 @@ export async function getTopRankingsForLogs(
   } else {
     list = getLocalRankings(passcode);
   }
-  if (pending) list = [...list, { name: pending.name, score: pending.score, time: '' }];
+
+  if (sessionStartTs != null && sessionStartTs > 0) {
+    list = list.filter((e) => e.time && new Date(e.time).getTime() >= sessionStartTs);
+  }
+  if (pending) list = [...list, { name: pending.name, score: pending.score, time: new Date().toISOString() }];
 
   const byName = new Map<string, number>();
   list.forEach((e) => {
@@ -92,9 +98,8 @@ export async function getTopRankingsForLogs(
   });
   const sorted = [...byName.entries()]
     .map(([name, score]) => ({ name, score, time: '' }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-  return sorted;
+    .sort((a, b) => b.score - a.score);
+  return sorted.slice(0, limit);
 }
 
 /** 将前 3 名写入云端 admin 中奖记录（Firebase 已配置时） */
@@ -123,8 +128,7 @@ export async function saveTop3ToAdminCloud(
   const snapshot = await get(adminLogsRef);
   const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
     snapshot.val() || [];
-  const filtered = logs.filter((l) => l.passcode !== roomKey);
-  const merged = [...filtered, ...entries];
+  const merged = [...logs, ...entries];
   await set(adminLogsRef, merged);
 }
 

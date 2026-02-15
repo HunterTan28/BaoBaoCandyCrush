@@ -381,26 +381,25 @@ const FruitMatchGame: React.FC<{
     saveRankingToCloud(passcode, nickname, score);
 
     const run = async () => {
-      const top3 = await getTopRankingsForLogs(passcode, 3, { name: nickname, score });
+      const sessionKey = `session_start_${passcode.trim()}`;
+      const sessionStart = localStorage.getItem(sessionKey);
+      const sessionStartTs = sessionStart ? parseInt(sessionStart, 10) : undefined;
+      const top3 = await getTopRankingsForLogs(passcode, 3, { name: nickname, score }, sessionStartTs);
       if (top3.length === 0) return;
       const gifts: { name: string }[] = JSON.parse(localStorage.getItem('app_gifts') || '[]');
       const defaultGifts = ['超级巨无霸甜品', '糖果礼物 2', '糖果礼物 3'];
       const logs: { nickname: string; passcode: string; giftName: string; timestamp: string; score: number }[] =
         JSON.parse(localStorage.getItem('app_logs') || '[]');
       const roomKey = passcode.trim();
-      const filtered = logs.filter((l) => l.passcode !== roomKey);
       const now = new Date().toLocaleString();
-      top3.forEach((entry, i) => {
-        const giftName = gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`;
-        filtered.push({
-          nickname: entry.name,
-          passcode: roomKey,
-          giftName,
-          timestamp: now,
-          score: entry.score,
-        });
-      });
-      localStorage.setItem('app_logs', JSON.stringify(filtered));
+      const newEntries = top3.map((entry, i) => ({
+        nickname: entry.name,
+        passcode: roomKey,
+        giftName: gifts[i]?.name ?? defaultGifts[i] ?? `第${i + 1}名`,
+        timestamp: now,
+        score: entry.score,
+      }));
+      localStorage.setItem('app_logs', JSON.stringify([...logs, ...newEntries]));
       await saveTop3ToAdminCloud(passcode, top3, gifts);
     };
     run();
