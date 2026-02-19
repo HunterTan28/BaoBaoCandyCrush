@@ -419,6 +419,48 @@ export function subscribeToAdminLogs(callback: (logs: AdminLogEntry[]) => void):
   return () => off(adminLogsRef);
 }
 
+export interface SessionScoreRow {
+  nickname: string;
+  score: number;
+  time?: string;
+}
+
+/** 订阅当前暗号的本局前 10 名（用于后台中奖名单展示）。Firebase 时读 session_score_table；否则按赛期从排行榜取前 10 并轮询 */
+export function subscribeToSessionTop10(passcode: string, callback: (rows: SessionScoreRow[]) => void): () => void {
+  const roomKey = normalizePasscode(passcode);
+  if (!roomKey) {
+    callback([]);
+    return () => {};
+  }
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const tableRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/session_score_table`);
+      const unsub = onValue(tableRef, (snapshot) => {
+        const data = snapshot.val();
+        const rows: SessionScoreRow[] = Array.isArray(data)
+          ? data.map((r: any) => ({ nickname: r?.nickname ?? '', score: r?.score ?? 0, time: r?.time }))
+          : [];
+        callback(rows);
+      });
+      return () => off(tableRef);
+    }
+  }
+  let cancelled = false;
+  const tick = async () => {
+    if (cancelled) return;
+    const sessionStartTs = await getSessionStartTsFromConfig(roomKey);
+    const list = await getTopRankingsForLogs(roomKey, 10, undefined, sessionStartTs ?? undefined);
+    if (!cancelled) callback(list.map((e) => ({ nickname: e.name, score: e.score, time: e.time })));
+  };
+  tick();
+  const t = setInterval(tick, 4000);
+  return () => {
+    cancelled = true;
+    clearInterval(t);
+  };
+}
+
 /** 获取本地排行榜（无 Firebase 时使用） */
 export function getLocalRankings(passcode: string): RankingEntry[] {
   const roomKey = normalizePasscode(passcode);

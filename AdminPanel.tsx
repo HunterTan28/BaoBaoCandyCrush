@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs } from './api/rankings';
+import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs, subscribeToSessionTop10 } from './api/rankings';
 import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, type AppearanceConfig } from './api/config';
 import { subscribeToLivePlayersForAdmin } from './api/liveScores';
 import { cropImageToSquare } from './utils/imageCrop';
@@ -44,6 +44,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
   const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
   const [livePlayers, setLivePlayers] = useState<{ name: string; score: number }[]>([]);
+  const [sessionTop10, setSessionTop10] = useState<{ nickname: string; score: number; time?: string }[]>([]);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const bgInputRef = useRef<HTMLInputElement | null>(null);
   const musicInputRef = useRef<HTMLInputElement | null>(null);
@@ -89,6 +90,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   useEffect(() => {
     if (activeTab !== 'live' || !secretCode.trim()) return;
     const unsub = subscribeToLivePlayersForAdmin(secretCode.trim(), setLivePlayers);
+    return unsub;
+  }, [activeTab, secretCode]);
+
+  useEffect(() => {
+    if (activeTab !== 'logs' || !secretCode.trim()) return;
+    const unsub = subscribeToSessionTop10(secretCode.trim(), setSessionTop10);
     return unsub;
   }, [activeTab, secretCode]);
 
@@ -295,14 +302,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
               </div>
             ) : (
               <div className="bg-white/60 rounded-3xl p-6">
+                <p className="text-sky-500 text-sm mb-3">当前暗号「{secretCode}」本局前 10 名（仅前三名含并列第三可抽奖）</p>
                  <table className="w-full text-left">
-                    <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>昵称</th><th>暗号</th><th>礼物</th><th>分数</th><th>时间</th></tr></thead>
+                    <thead><tr className="border-b text-sky-400 font-bold uppercase text-xs"><th>排名</th><th>昵称</th><th>分数</th><th>中奖礼物</th></tr></thead>
                     <tbody>
-                      {[...logs]
-                        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-                        .map((log, i) => (
-                          <tr key={i} className="border-b border-sky-50 text-sky-600"><td className="py-3 font-bold">{log.nickname}</td><td>{log.passcode}</td><td className="text-pink-500">{log.giftName}</td><td className="font-mono">{log.score}</td><td className="text-[10px] opacity-60">{log.timestamp}</td></tr>
-                        ))}
+                      {sessionTop10.length === 0 ? (
+                        <tr><td colSpan={4} className="py-6 text-center text-sky-400">暂无数据，请先开启赛期并等本局结束后点击刷新</td></tr>
+                      ) : (
+                        sessionTop10.map((row, i) => {
+                          const winner = logs.find((l) => l.passcode === secretCode && l.nickname === row.nickname);
+                          return (
+                            <tr key={i} className="border-b border-sky-50 text-sky-600">
+                              <td className="py-3 font-mono text-sky-500">#{i + 1}</td>
+                              <td className="py-3 font-bold">{row.nickname}</td>
+                              <td className="font-mono">{row.score}</td>
+                              <td className="text-pink-500">{winner ? winner.giftName : '—'}</td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                  </table>
               </div>
