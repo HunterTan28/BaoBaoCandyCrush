@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
-import { saveRankingToCloud } from '../api/rankings';
-import { subscribeToAppearance } from '../api/config';
+import { saveRankingToCloud, subscribeToRankings } from '../api/rankings';
+import { subscribeToAppearance, getSessionStartTs } from '../api/config';
 
 export const TILES = ['🍬', '🍭', '🧁', '🍮', '🍩', '🍫', '🥯', '🥞'];
 const ROWS = 8;
@@ -221,7 +221,20 @@ const FruitMatchGame: React.FC<{
   const hasSavedOnEnd = useRef(false);
 
   const { livePlayers, isLive } = useLiveScores(passcode, nickname, score);
+  const [rankings, setRankings] = useState<{ name: string; score: number }[]>([]);
   const [tileImages, setTileImages] = useState<string[]>([]);
+
+  useEffect(() => {
+    let unsub = () => {};
+    const setup = async () => {
+      const sessionStartTs = await getSessionStartTs(passcode);
+      return subscribeToRankings(passcode, (list) => {
+        setRankings(list.slice(0, 20).map((e) => ({ name: e.name, score: e.score })));
+      }, sessionStartTs ?? undefined);
+    };
+    setup().then((fn) => { unsub = fn; });
+    return () => unsub();
+  }, [passcode]);
 
   useEffect(() => {
     const unsub = subscribeToAppearance((cfg) => setTileImages(cfg.tileImages || []));
@@ -516,19 +529,28 @@ const FruitMatchGame: React.FC<{
         </div>
 
         <div className="w-full lg:w-64 bg-white/90 p-6 rounded-3xl border-2 border-pink-100 shadow-md">
-          <h3 className="text-sky-500 font-bold mb-4 flex items-center gap-2">📊 实时榜单</h3>
+          <h3 className="text-sky-500 font-bold mb-4 flex items-center gap-2">📊 得分表（保留至新赛季）</h3>
           <div className="space-y-3">
-            {livePlayers.map((p, i) => (
-              <div
-                key={i}
-                className={`flex justify-between items-center p-2 rounded-lg ${p.isMe ? 'bg-pink-100 border border-pink-300' : 'bg-gray-50'}`}
-              >
-                <span className={`text-sm ${p.isMe ? 'font-bold text-pink-600' : 'text-gray-600'}`}>
-                  {i + 1}. {p.name}
-                </span>
-                <span className="font-mono text-xs font-black">{p.score}</span>
-              </div>
-            ))}
+            {(() => {
+              const byName = new Map<string, { score: number; isMe: boolean }>();
+              livePlayers.forEach((p) => byName.set(p.name, { score: p.score, isMe: p.isMe }));
+              rankings.forEach((r) => {
+                const cur = byName.get(r.name);
+                if (!cur || r.score > cur.score) byName.set(r.name, { score: r.score, isMe: r.name === nickname });
+              });
+              const merged = [...byName.entries()].map(([name, { score, isMe }]) => ({ name, score, isMe })).sort((a, b) => b.score - a.score);
+              return merged.map((p, i) => (
+                <div
+                  key={i}
+                  className={`flex justify-between items-center p-2 rounded-lg ${p.isMe ? 'bg-pink-100 border border-pink-300' : 'bg-gray-50'}`}
+                >
+                  <span className={`text-sm ${p.isMe ? 'font-bold text-pink-600' : 'text-gray-600'}`}>
+                    {i + 1}. {p.name}
+                  </span>
+                  <span className="font-mono text-xs font-black">{p.score}</span>
+                </div>
+              ));
+            })()}
           </div>
           <p className="mt-6 text-[10px] text-pink-400 font-bold bg-pink-50 p-2 rounded-lg animate-pulse">
             📢 {battleMessage}

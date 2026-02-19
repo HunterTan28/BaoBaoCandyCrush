@@ -72,6 +72,34 @@ export async function getSessionStartTs(passcode: string): Promise<number | unde
   return typeof val === 'number' ? val : undefined;
 }
 
+/** 订阅赛期是否已开始（用于等待室：admin 开启后玩家可进入游戏） */
+export function subscribeToSessionStart(passcode: string, callback: (started: boolean) => void): () => void {
+  const roomKey = (passcode || '').trim();
+  if (!roomKey) {
+    callback(false);
+    return () => {};
+  }
+  if (isFirebaseConfigured()) {
+    const database = getFirebaseDb();
+    if (database) {
+      const configRef = ref(database, `${SESSION_STARTS_PATH}/${encodeURIComponent(roomKey)}`);
+      const unsub = onValue(configRef, (snapshot) => {
+        const val = snapshot.val();
+        const ts = typeof val === 'number' ? val : 0;
+        if (ts > 0) localStorage.setItem(`session_start_${roomKey}`, String(ts));
+        callback(ts > 0);
+      });
+      return () => off(configRef);
+    }
+  }
+  const check = () => {
+    const local = localStorage.getItem(`session_start_${roomKey}`);
+    callback(!!(local && parseInt(local, 10) > 0));
+  };
+  check();
+  return () => {};
+}
+
 const CONFIG_GIFTS_KEY = 'config/gifts';
 const LOCAL_STORAGE_GIFTS_KEY = 'app_gifts';
 

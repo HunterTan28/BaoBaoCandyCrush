@@ -52,9 +52,9 @@ const Dashboard: React.FC<DashboardProps> = ({ nickname, passcode, onLogout, onS
 
   useEffect(() => {
     const fetchGreeting = async () => {
-      const prompt = `你是一个可爱糖果世界的引导者。现在有一位名叫 "${nickname}" 的玩家登录了。请写一段简短、甜美、激励性的欢迎辞。字数在30字以内。提到：“只有竞技前五名才有神秘礼盒哦”。`;
+      const prompt = `你是一个可爱糖果世界的引导者。现在有一位名叫 "${nickname}" 的玩家登录了。请写一段简短、甜美、激励性的欢迎辞。字数在30字以内。提到：“只有竞技前三名（含并列第三）才有神秘礼盒哦”。`;
       const text = await generateGameContent(prompt);
-      setAiMessage(text || `欢迎 ${nickname} 回到糖果屋！积分排名前五的宝宝才能拿走礼盒哦，快快冲鸭！`);
+      setAiMessage(text || `欢迎 ${nickname} 回到糖果屋！积分前三名（含并列第三）的宝宝才能抽礼盒哦，快快冲鸭！`);
     };
     fetchGreeting();
   }, [nickname]);

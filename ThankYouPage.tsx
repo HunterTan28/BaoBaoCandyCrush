@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAppearance, getGiftsForDraw, getSessionStartTs, type GiftForDraw } from './api/config';
-import { getTopRankingsForLogs, saveLotteryToPending } from './api/rankings';
+import { getTopRankingsForLogs, getTop3WithTiesFromSorted, saveLotteryToPending } from './api/rankings';
 
 const DEFAULT_MUSIC_URL = '/bkmusic.mp3';
 
@@ -68,10 +68,11 @@ const ThankYouPage: React.FC<ThankYouPageProps> = ({ nickname, passcode, score, 
         return;
       }
       const sessionStartTs = await getSessionStartTs(roomKey);
-      const top5 = await getTopRankingsForLogs(roomKey, 5, { name: nickname, score }, sessionStartTs ?? undefined);
+      const top10 = await getTopRankingsForLogs(roomKey, 10, { name: nickname, score }, sessionStartTs ?? undefined);
       if (cancelled) return;
-      const rank = top5.findIndex((e) => e.name === nickname);
-      setIsTop3(rank >= 0 && rank < 5);
+      const top3WithTies = getTop3WithTiesFromSorted(top10);
+      const canDraw = top3WithTies.some((e) => e.name === nickname);
+      setIsTop3(canDraw);
       const g = await getGiftsForDraw();
       if (!cancelled) setGifts(g.filter((x) => x.name?.trim()).length > 0 ? g : [{ name: '糖果礼物', probability: 100 }]);
     };

@@ -115,3 +115,37 @@ export function useLiveScores(passcode: string, nickname: string, myScore: numbe
 
   return { livePlayers, isLive };
 }
+
+/** 管理员用：订阅当前暗号房间的实时玩家得分（本局实时战况），按分数降序 */
+export function subscribeToLivePlayersForAdmin(passcode: string, callback: (players: { name: string; score: number }[]) => void): () => void {
+  const roomKey = (passcode || '').trim();
+  if (!roomKey) {
+    callback([]);
+    return () => {};
+  }
+  if (!isFirebaseConfigured()) {
+    callback([]);
+    return () => {};
+  }
+  const database = getFirebaseDb();
+  if (!database) {
+    callback([]);
+    return () => {};
+  }
+  const roomRef = ref(database, `rooms/${encodeURIComponent(roomKey)}/players`);
+  const unsubscribe = onValue(roomRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) {
+      callback([]);
+      return;
+    }
+    const now = Date.now();
+    const list = Object.values(data)
+      .map((p: any) => ({ name: p?.name || '未知', score: p?.score ?? 0, lastUpdate: p?.lastUpdate ?? 0 }))
+      .filter((p: { lastUpdate: number }) => now - p.lastUpdate < LIVE_TIMEOUT_MS)
+      .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
+      .map((p: { name: string; score: number }) => ({ name: p.name, score: p.score }));
+    callback(list);
+  });
+  return () => off(roomRef);
+}

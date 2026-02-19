@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs } from './api/rankings';
 import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, type AppearanceConfig } from './api/config';
+import { subscribeToLivePlayersForAdmin } from './api/liveScores';
 import { cropImageToSquare } from './utils/imageCrop';
 
 interface Gift {
@@ -33,7 +34,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'gifts' | 'logs' | 'settings' | 'sync' | 'appearance'>('gifts');
+  const [activeTab, setActiveTab] = useState<'gifts' | 'logs' | 'live' | 'settings' | 'sync' | 'appearance'>('gifts');
   
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
@@ -42,6 +43,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [saveStatus, setSaveStatus] = useState('');
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
   const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
+  const [livePlayers, setLivePlayers] = useState<{ name: string; score: number }[]>([]);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const bgInputRef = useRef<HTMLInputElement | null>(null);
   const musicInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,6 +84,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
+  }, [activeTab, secretCode]);
+
+  useEffect(() => {
+    if (activeTab !== 'live' || !secretCode.trim()) return;
+    const unsub = subscribeToLivePlayersForAdmin(secretCode.trim(), setLivePlayers);
+    return unsub;
   }, [activeTab, secretCode]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
@@ -222,6 +230,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
       <div className="flex bg-white/20 flex-wrap">
         <button onClick={() => setActiveTab('gifts')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'gifts' ? 'bg-pink-400 text-white' : 'text-pink-300'}`}>礼物配置</button>
         <button onClick={() => setActiveTab('logs')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'logs' ? 'bg-sky-400 text-white' : 'text-sky-300'}`}>中奖记录</button>
+        <button onClick={() => setActiveTab('live')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'live' ? 'bg-amber-500 text-white' : 'text-amber-400'}`}>实时战况</button>
         <button onClick={() => setActiveTab('settings')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'settings' ? 'bg-pink-500 text-white' : 'text-pink-300'}`}>基本设置</button>
         <button onClick={() => setActiveTab('appearance')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'appearance' ? 'bg-violet-500 text-white' : 'text-violet-300'}`}>外观音效</button>
         <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-indigo-300'}`}>全服同步</button>
@@ -272,7 +281,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         {activeTab === 'logs' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center flex-wrap gap-4">
-              <h3 className="text-2xl font-bold text-sky-600">中奖名单（从得分表前五名抽取）</h3>
+              <h3 className="text-2xl font-bold text-sky-600">中奖名单（仅前三名含并列第三可抽奖，保留本局前10名）</h3>
               <div className="flex gap-3">
                 <button type="button" onClick={async () => { await mergePendingToAdminLogs(secretCode, true); const data = await fetchAdminLogs(); setLogs(data); setSaveStatus('已刷新'); setTimeout(() => setSaveStatus(''), 2000); }} className="bubble-btn px-6 py-2 bg-sky-400 text-white rounded-full font-bold text-sm hover:bg-sky-500">🔄 刷新</button>
                 <button type="button" onClick={handleClearLogs} className="bubble-btn px-6 py-2 bg-rose-400 text-white rounded-full font-bold text-sm hover:bg-rose-500">清空中奖记录</button>
@@ -298,6 +307,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
                  </table>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'live' && (
+          <div className="space-y-6">
+            <h3 className="text-2xl font-bold text-amber-600">本局实时得分（暗号：{secretCode || '—'}）</h3>
+            <p className="text-amber-600 text-sm">仅显示近 20 秒内有活动的玩家，开启赛期后玩家开始游戏即可看到</p>
+            <div className="bg-white/60 rounded-3xl p-6">
+              {livePlayers.length === 0 ? (
+                <p className="text-amber-500 text-center py-8">暂无实时数据</p>
+              ) : (
+                <div className="space-y-2">
+                  {livePlayers.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
+                      <span className="font-bold text-amber-800">#{i + 1} {p.name}</span>
+                      <span className="font-mono font-bold text-amber-600">{p.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

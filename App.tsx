@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAppearance } from './api/config';
 import LoginForm from './LoginForm';
 import Dashboard from './components/Dashboard';
+import WaitingRoom from './components/WaitingRoom';
 import FruitMatchGame from './components/FruitMatchGame';
 import AdminPanel from './AdminPanel';
 import ThankYouPage from './ThankYouPage';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{ nickname: string; passcode: string } | null>(null);
-  const [gameState, setGameState] = useState<'login' | 'dashboard' | 'playing' | 'finished' | 'admin'>('login');
+  const [gameState, setGameState] = useState<'login' | 'waiting' | 'dashboard' | 'playing' | 'finished' | 'admin'>('login');
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
   const [finalScore, setFinalScore] = useState<number>(0);
 
@@ -49,7 +50,7 @@ const App: React.FC = () => {
 
   const handleLogin = (nickname: string, passcode: string) => {
     setUser({ nickname, passcode });
-    setGameState('dashboard');
+    setGameState(passcode === '测试' ? 'dashboard' : 'waiting');
   };
 
   return (
@@ -58,7 +59,16 @@ const App: React.FC = () => {
       
       <main className="relative z-10 w-full flex justify-center">
         {gameState === 'login' && <LoginForm onLoginSuccess={handleLogin} onAdminLogin={() => setGameState('admin')} />}
-        
+
+        {gameState === 'waiting' && user && (
+          <WaitingRoom
+            nickname={user.nickname}
+            passcode={user.passcode}
+            onSessionStarted={() => setGameState('dashboard')}
+            onLogout={() => { setUser(null); setGameState('login'); }}
+          />
+        )}
+
         {gameState === 'dashboard' && user && (
           <Dashboard 
             {...user} 

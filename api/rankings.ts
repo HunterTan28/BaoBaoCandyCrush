@@ -121,6 +121,16 @@ export async function getTopRankingsForLogs(
   return sorted.slice(0, limit);
 }
 
+/** 从已按分数降序排列的列表中取出「前 3 名（含并列第三）」：第 1、第 2 及所有与第 3 名同分的人 */
+export function getTop3WithTiesFromSorted(sorted: RankingEntry[]): RankingEntry[] {
+  if (sorted.length === 0) return [];
+  if (sorted.length <= 3) return [...sorted];
+  const thirdScore = sorted[2].score;
+  const firstTwo = sorted.slice(0, 2);
+  const tiedThird = sorted.slice(2).filter((e) => e.score === thirdScore);
+  return [...firstTwo, ...tiedThird];
+}
+
 /** 将前 3 名写入云端 admin 中奖记录（Firebase 已配置时）。giftNames 为每人随机抽中的礼物名 */
 export async function saveTop3ToAdminCloud(
   passcode: string,
@@ -223,28 +233,30 @@ export async function getPendingLottery(passcode: string): Promise<Record<string
   return result;
 }
 
-/** 将待定抽奖结果中的前 5 名合并到 admin_logs。force 为 true 时跳过赛期检查，直接从排行榜取前五 */
+/** 将待定抽奖结果中的「前 3 名（含并列第三）」合并到 admin_logs；本局得分保留前 10 名到 session_score_table。force 为 true 时跳过赛期检查 */
 export async function mergePendingToAdminLogs(passcode: string, force?: boolean): Promise<void> {
   const roomKey = normalizePasscode(passcode);
   if (!roomKey) return;
 
-  let top5: { name: string; score: number; time: string }[];
+  const TOP_N_KEEP = 10;
+  let top10: RankingEntry[];
   let sessionStartTs: number | undefined;
   if (force) {
-    top5 = await getTopRankingsForLogs(roomKey, 5, undefined, undefined);
+    top10 = await getTopRankingsForLogs(roomKey, TOP_N_KEEP, undefined, undefined);
   } else {
     sessionStartTs = await getSessionStartTsFromConfig(roomKey);
     if (sessionStartTs == null || sessionStartTs <= 0) return;
     const elapsed = (Date.now() - sessionStartTs) / 1000;
     if (elapsed < SESSION_DURATION_SEC) return;
-    top5 = await getTopRankingsForLogs(roomKey, 5, undefined, sessionStartTs);
-    await saveSessionScoreTableToCloud(roomKey, sessionStartTs);
+    top10 = await getTopRankingsForLogs(roomKey, TOP_N_KEEP, undefined, sessionStartTs);
+    await saveSessionScoreTableToCloud(roomKey, sessionStartTs, TOP_N_KEEP);
   }
+  const top3WithTies = getTop3WithTiesFromSorted(top10);
   const pending = await getPendingLottery(roomKey);
-  if (top5.length === 0) return;
+  if (top3WithTies.length === 0) return;
 
   const now = new Date().toLocaleString();
-  const entries: AdminLogEntry[] = top5.map((e) => ({
+  const entries: AdminLogEntry[] = top3WithTies.map((e) => ({
     nickname: e.name,
     passcode: roomKey,
     giftName: pending[e.name]?.giftName ?? '糖果礼物',
@@ -276,10 +288,10 @@ export async function mergePendingToAdminLogs(passcode: string, force?: boolean)
   }
 }
 
-/** 赛期结束后将完整得分表写入数据库。该得分表保留到下个赛期开始之前（管理员开启新赛期时才被新数据替换） */
-async function saveSessionScoreTableToCloud(roomKey: string, sessionStartTs: number): Promise<void> {
-  const topAll = await getTopRankingsForLogs(roomKey, 999, undefined, sessionStartTs);
-  const scoreTable = topAll.map((e) => ({ nickname: e.name, score: e.score, time: e.time || new Date().toISOString() }));
+/** 赛期结束后将本局前 N 名得分表写入数据库（默认前 10 名）。该得分表保留到下个赛期开始之前 */
+async function saveSessionScoreTableToCloud(roomKey: string, sessionStartTs: number, limit: number = 10): Promise<void> {
+  const topN = await getTopRankingsForLogs(roomKey, limit, undefined, sessionStartTs);
+  const scoreTable = topN.map((e) => ({ nickname: e.name, score: e.score, time: e.time || new Date().toISOString() }));
   const localKey = `score_table_${roomKey}_${sessionStartTs}`;
   localStorage.setItem(localKey, JSON.stringify(scoreTable));
 
