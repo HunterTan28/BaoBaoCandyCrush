@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs, subscribeToSessionTop10 } from './api/rankings';
-import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, type AppearanceConfig } from './api/config';
-import { subscribeToLivePlayersForAdmin } from './api/liveScores';
+import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs, subscribeToSessionTop10, subscribeToRankings } from './api/rankings';
+import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, getSessionStartTs, type AppearanceConfig } from './api/config';
 import { cropImageToSquare } from './utils/imageCrop';
 
 interface Gift {
@@ -45,6 +44,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
   const [livePlayers, setLivePlayers] = useState<{ name: string; score: number }[]>([]);
   const [sessionTop10, setSessionTop10] = useState<{ nickname: string; score: number; time?: string }[]>([]);
+  const liveUnsubRef = useRef<() => void>(() => {});
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const bgInputRef = useRef<HTMLInputElement | null>(null);
   const musicInputRef = useRef<HTMLInputElement | null>(null);
@@ -89,8 +89,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
   useEffect(() => {
     if (activeTab !== 'live' || !secretCode.trim()) return;
-    const unsub = subscribeToLivePlayersForAdmin(secretCode.trim(), setLivePlayers);
-    return unsub;
+    let cancelled = false;
+    getSessionStartTs(secretCode.trim()).then((sessionStartTs) => {
+      if (cancelled) return;
+      liveUnsubRef.current = subscribeToRankings(secretCode.trim(), (list) => {
+        if (!cancelled) setLivePlayers(list.map((e) => ({ name: e.name, score: e.score })));
+      }, sessionStartTs ?? undefined);
+    });
+    return () => {
+      cancelled = true;
+      liveUnsubRef.current();
+    };
   }, [activeTab, secretCode]);
 
   useEffect(() => {
@@ -331,7 +340,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         {activeTab === 'live' && (
           <div className="space-y-6">
             <h3 className="text-2xl font-bold text-amber-600">本局实时得分（暗号：{secretCode || '—'}）</h3>
-            <p className="text-amber-600 text-sm">仅显示近 20 秒内有活动的玩家，开启赛期后玩家开始游戏即可看到</p>
+            <p className="text-amber-600 text-sm">本赛期全部玩家得分（按最高分排序，结束对局后仍保留在榜）</p>
             <div className="bg-white/60 rounded-3xl p-6">
               {livePlayers.length === 0 ? (
                 <p className="text-amber-500 text-center py-8">暂无实时数据</p>

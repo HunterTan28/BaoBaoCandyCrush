@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useLiveScores } from '../api/liveScores';
 import { generateGameContent } from '../api/gemini';
 import { saveRankingToCloud, subscribeToRankings } from '../api/rankings';
 import { subscribeToAppearance, getSessionStartTs } from '../api/config';
@@ -220,7 +219,6 @@ const FruitMatchGame: React.FC<{
   const [floatingScores, setFloatingScores] = useState<{ id: string; r: number; c: number; value: number; batchId?: number }[]>([]);
   const hasSavedOnEnd = useRef(false);
 
-  const { livePlayers, isLive } = useLiveScores(passcode, nickname, score);
   const [rankings, setRankings] = useState<{ name: string; score: number }[]>([]);
   const [tileImages, setTileImages] = useState<string[]>([]);
 
@@ -229,7 +227,7 @@ const FruitMatchGame: React.FC<{
     const setup = async () => {
       const sessionStartTs = await getSessionStartTs(passcode);
       return subscribeToRankings(passcode, (list) => {
-        setRankings(list.slice(0, 20).map((e) => ({ name: e.name, score: e.score })));
+        setRankings(list.slice(0, 50).map((e) => ({ name: e.name, score: e.score })));
       }, sessionStartTs ?? undefined);
     };
     setup().then((fn) => { unsub = fn; });
@@ -529,16 +527,17 @@ const FruitMatchGame: React.FC<{
         </div>
 
         <div className="w-full lg:w-64 bg-white/90 p-6 rounded-3xl border-2 border-pink-100 shadow-md">
-          <h3 className="text-sky-500 font-bold mb-4 flex items-center gap-2">📊 得分表（保留至新赛季）</h3>
+          <h3 className="text-sky-500 font-bold mb-4 flex items-center gap-2">📊 本赛期得分表</h3>
           <div className="space-y-3">
             {(() => {
-              const byName = new Map<string, { score: number; isMe: boolean }>();
-              livePlayers.forEach((p) => byName.set(p.name, { score: p.score, isMe: p.isMe }));
+              const byName = new Map<string, number>();
               rankings.forEach((r) => {
                 const cur = byName.get(r.name);
-                if (!cur || r.score > cur.score) byName.set(r.name, { score: r.score, isMe: r.name === nickname });
+                if (cur === undefined || r.score > cur) byName.set(r.name, r.score);
               });
-              const merged = [...byName.entries()].map(([name, { score, isMe }]) => ({ name, score, isMe })).sort((a, b) => b.score - a.score);
+              const myBest = byName.get(nickname) ?? 0;
+              byName.set(nickname, Math.max(myBest, score));
+              const merged = [...byName.entries()].map(([name, s]) => ({ name, score: s, isMe: name === nickname })).sort((a, b) => b.score - a.score);
               return merged.map((p, i) => (
                 <div
                   key={i}
