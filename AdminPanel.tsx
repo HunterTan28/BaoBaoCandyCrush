@@ -33,7 +33,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'gifts' | 'logs' | 'live' | 'settings' | 'appearance'>('gifts');
+  const [activeTab, setActiveTab] = useState<'gifts' | 'logs' | 'live' | 'settings' | 'sync' | 'appearance'>('gifts');
   
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
@@ -246,9 +246,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
       <div className="flex bg-white/20 flex-wrap">
         <button onClick={() => setActiveTab('gifts')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'gifts' ? 'bg-pink-400 text-white' : 'text-pink-300'}`}>礼物配置</button>
         <button onClick={() => setActiveTab('logs')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'logs' ? 'bg-sky-400 text-white' : 'text-sky-300'}`}>中奖记录</button>
-        <button onClick={() => setActiveTab('live')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'live' ? 'bg-amber-500 text-white' : 'text-amber-400'}`}>中奖榜单</button>
+        <button onClick={() => setActiveTab('live')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'live' ? 'bg-amber-500 text-white' : 'text-amber-400'}`}>实时战况</button>
         <button onClick={() => setActiveTab('settings')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'settings' ? 'bg-pink-500 text-white' : 'text-pink-300'}`}>基本设置</button>
         <button onClick={() => setActiveTab('appearance')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'appearance' ? 'bg-violet-500 text-white' : 'text-violet-300'}`}>外观音效</button>
+        <button onClick={() => setActiveTab('sync')} className={`flex-1 min-w-[80px] py-5 font-bold transition-all ${activeTab === 'sync' ? 'bg-indigo-500 text-white' : 'text-indigo-300'}`}>全服同步</button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 bg-white/30">
@@ -338,37 +339,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
 
         {activeTab === 'live' && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-amber-600">中奖榜单（暗号：{secretCode || '—'}）</h3>
-            <p className="text-amber-600 text-sm">本赛期全部玩家按最高分排序，仅前三名含并列第三可抽奖；抽中后显示对应礼物</p>
-            <div className="bg-white/60 rounded-3xl p-6 overflow-x-auto">
-              {(() => {
-                const byName = new Map<string, number>();
-                sessionRankings.forEach((r) => byName.set(r.name, r.score));
-                livePlayers.forEach((p) => {
-                  const cur = byName.get(p.name);
-                  if (cur === undefined || p.score > cur) byName.set(p.name, p.score);
-                });
-                const merged = [...byName.entries()].map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score);
-                if (merged.length === 0) return <p className="text-amber-500 text-center py-8">暂无数据，等玩家开始游戏后会出现</p>;
-                return (
-                  <table className="w-full text-left">
-                    <thead><tr className="border-b text-amber-600 font-bold uppercase text-xs"><th>排名</th><th>昵称</th><th>分数</th><th>中奖礼物</th></tr></thead>
-                    <tbody>
-                      {merged.map((p, i) => {
-                        const winner = logs.find((l) => l.passcode === secretCode && l.nickname === p.name);
-                        return (
-                          <tr key={i} className="border-b border-amber-50 text-amber-800">
-                            <td className="py-3 font-mono text-amber-600">#{i + 1}</td>
-                            <td className="py-3 font-bold">{p.name}</td>
-                            <td className="font-mono">{p.score}</td>
-                            <td className="text-pink-500">{winner ? winner.giftName : '—'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                );
-              })()}
+            <h3 className="text-2xl font-bold text-amber-600">本局实时得分（暗号：{secretCode || '—'}）</h3>
+            <p className="text-amber-600 text-sm">本赛期全部玩家得分（按最高分排序，结束对局后仍保留在榜）</p>
+            <div className="bg-white/60 rounded-3xl p-6">
+              {livePlayers.length === 0 ? (
+                <p className="text-amber-500 text-center py-8">暂无实时数据</p>
+              ) : (
+                <div className="space-y-2">
+                  {livePlayers.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
+                      <span className="font-bold text-amber-800">#{i + 1} {p.name}</span>
+                      <span className="font-mono font-bold text-amber-600">{p.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -509,6 +494,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
             </div>
 
             <button onClick={handleSaveAppearance} className="bubble-btn px-10 py-3 bg-violet-500 text-white rounded-full font-bold">保存外观音效</button>
+          </div>
+        )}
+
+        {activeTab === 'sync' && (
+          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in">
+            <div className="bg-white/80 rounded-3xl p-8 shadow-lg border-2 border-indigo-100">
+              <h3 className="text-indigo-600 font-bold text-xl mb-6">全服实时同步</h3>
+              <div className="space-y-4 text-indigo-800">
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-200">
+                  <span className="text-2xl">✓</span>
+                  <div>
+                    <p className="font-bold text-green-800">已接入 Firebase Realtime Database</p>
+                    <p className="text-sm text-green-700">同一暗号下的玩家可实时看到彼此分数</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-indigo-50 rounded-xl">
+                    <p className="font-bold text-indigo-700 text-sm mb-1">实时榜单</p>
+                    <p className="text-sm text-indigo-600">游戏中右侧显示本局所有在线玩家分数，每 2 秒同步</p>
+                  </div>
+                  <div className="p-4 bg-indigo-50 rounded-xl">
+                    <p className="font-bold text-indigo-700 text-sm mb-1">历史排行榜</p>
+                    <p className="text-sm text-indigo-600">每局结束后成绩写入云端，大厅展示前 5 名</p>
+                  </div>
+                </div>
+                <p className="text-sm text-indigo-600 pt-2">玩家使用相同暗号进入游戏即可自动加入同一房间，无需额外配置。</p>
+              </div>
+            </div>
           </div>
         )}
 
