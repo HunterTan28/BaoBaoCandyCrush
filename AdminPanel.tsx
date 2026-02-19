@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { subscribeToAdminLogs, clearAdminLogs, getSessionTimeLeft, mergePendingToAdminLogs, fetchAdminLogs, subscribeToSessionTop10, subscribeToRankings } from './api/rankings';
 import { subscribeToSecretCode, saveSecretCodeToCloud, saveSessionStartToCloud, subscribeToGifts, saveGiftsToCloud, subscribeToAppearance, saveAppearanceToCloud, getSessionStartTs, type AppearanceConfig } from './api/config';
-import { subscribeToLivePlayersForAdmin } from './api/liveScores';
 import { cropImageToSquare } from './utils/imageCrop';
 
 interface Gift {
@@ -44,10 +43,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number | null>(null);
   const [appearance, setAppearance] = useState<AppearanceConfig>({ backgroundUrl: '', tileImages: [], endMusicUrl: '', logoUrl: '' });
   const [livePlayers, setLivePlayers] = useState<{ name: string; score: number }[]>([]);
-  const [sessionRankings, setSessionRankings] = useState<{ name: string; score: number }[]>([]);
   const [sessionTop10, setSessionTop10] = useState<{ nickname: string; score: number; time?: string }[]>([]);
   const liveUnsubRef = useRef<() => void>(() => {});
-  const liveRoomUnsubRef = useRef<() => void>(() => {});
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const bgInputRef = useRef<HTMLInputElement | null>(null);
   const musicInputRef = useRef<HTMLInputElement | null>(null);
@@ -93,19 +90,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
   useEffect(() => {
     if (activeTab !== 'live' || !secretCode.trim()) return;
     let cancelled = false;
-    liveRoomUnsubRef.current = subscribeToLivePlayersForAdmin(secretCode.trim(), (roomPlayers) => {
-      if (!cancelled) setLivePlayers(roomPlayers);
-    });
     getSessionStartTs(secretCode.trim()).then((sessionStartTs) => {
       if (cancelled) return;
       liveUnsubRef.current = subscribeToRankings(secretCode.trim(), (list) => {
-        if (!cancelled) setSessionRankings(list.map((e) => ({ name: e.name, score: e.score })));
+        if (!cancelled) setLivePlayers(list.map((e) => ({ name: e.name, score: e.score })));
       }, sessionStartTs ?? undefined);
     });
     return () => {
       cancelled = true;
       liveUnsubRef.current();
-      liveRoomUnsubRef.current();
     };
   }, [activeTab, secretCode]);
 
@@ -347,28 +340,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onExit }) => {
         {activeTab === 'live' && (
           <div className="space-y-6">
             <h3 className="text-2xl font-bold text-amber-600">本局实时得分（暗号：{secretCode || '—'}）</h3>
-            <p className="text-amber-600 text-sm">本赛期全部玩家 + 当前对局实况（按最高分排序，结束对局后仍保留在榜）</p>
+            <p className="text-amber-600 text-sm">本赛期全部玩家得分（按最高分排序，结束对局后仍保留在榜）</p>
             <div className="bg-white/60 rounded-3xl p-6">
-              {(() => {
-                const byName = new Map<string, number>();
-                sessionRankings.forEach((r) => byName.set(r.name, r.score));
-                livePlayers.forEach((p) => {
-                  const cur = byName.get(p.name);
-                  if (cur === undefined || p.score > cur) byName.set(p.name, p.score);
-                });
-                const merged = [...byName.entries()].map(([name, score]) => ({ name, score })).sort((a, b) => b.score - a.score);
-                if (merged.length === 0) return <p className="text-amber-500 text-center py-8">暂无数据，等玩家开始游戏后会出现</p>;
-                return (
-                  <div className="space-y-2">
-                    {merged.map((p, i) => (
-                      <div key={i} className="flex justify-between items-center px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
-                        <span className="font-bold text-amber-800">#{i + 1} {p.name}</span>
-                        <span className="font-mono font-bold text-amber-600">{p.score}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+              {livePlayers.length === 0 ? (
+                <p className="text-amber-500 text-center py-8">暂无实时数据</p>
+              ) : (
+                <div className="space-y-2">
+                  {livePlayers.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center px-4 py-3 rounded-xl bg-amber-50 border border-amber-100">
+                      <span className="font-bold text-amber-800">#{i + 1} {p.name}</span>
+                      <span className="font-mono font-bold text-amber-600">{p.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
