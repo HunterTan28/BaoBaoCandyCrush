@@ -61,17 +61,13 @@ export function useLiveScores(passcode: string, nickname: string, myScore: numbe
         setIsLive(false);
         return;
       }
-      const now = Date.now();
       const list = Object.entries(data)
         .map(([id, p]: [string, any]) => ({
           name: p?.name || '未知',
           score: p?.score ?? 0,
-          lastUpdate: p?.lastUpdate ?? 0,
           isMe: id === clientId,
         }))
-        .filter((p) => now - p.lastUpdate < LIVE_TIMEOUT_MS)
-        .sort((a, b) => b.score - a.score)
-        .map((p) => ({ name: p.name, score: p.score, isMe: p.isMe }));
+        .sort((a, b) => b.score - a.score);
 
       setLivePlayers(list);
       setIsLive(list.length > 1);
@@ -95,11 +91,10 @@ export function useLiveScores(passcode: string, nickname: string, myScore: numbe
         players.push({ name: nickname, score: myScore, lastUpdate: Date.now() });
       }
 
-      const activePlayers = players.filter((p: any) => Date.now() - p.lastUpdate < LIVE_TIMEOUT_MS);
-      localStorage.setItem(storageKey, JSON.stringify(activePlayers));
+      localStorage.setItem(storageKey, JSON.stringify(players));
 
       setLivePlayers(
-        activePlayers
+        players
           .map((p: any) => ({
             name: p.name,
             score: p.score,
@@ -107,7 +102,7 @@ export function useLiveScores(passcode: string, nickname: string, myScore: numbe
           }))
           .sort((a: PlayerScore, b: PlayerScore) => b.score - a.score)
       );
-      setIsLive(activePlayers.length > 1);
+      setIsLive(players.length > 1);
     }, 2000);
 
     return () => clearInterval(interval);
@@ -139,12 +134,9 @@ export function subscribeToLivePlayersForAdmin(passcode: string, callback: (play
       callback([]);
       return;
     }
-    const now = Date.now();
     const list = Object.values(data)
-      .map((p: any) => ({ name: p?.name || '未知', score: p?.score ?? 0, lastUpdate: p?.lastUpdate ?? 0 }))
-      .filter((p: { lastUpdate: number }) => now - p.lastUpdate < LIVE_TIMEOUT_MS)
-      .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
-      .map((p: { name: string; score: number }) => ({ name: p.name, score: p.score }));
+      .map((p: any) => ({ name: p?.name || '未知', score: p?.score ?? 0 }))
+      .sort((a: { score: number }, b: { score: number }) => b.score - a.score);
     callback(list);
   });
   return () => off(roomRef);
