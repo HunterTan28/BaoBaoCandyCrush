@@ -16,15 +16,40 @@
    - **Root directory**: 留空（项目根目录）
 4. 点击 **Save and Deploy** 先完成第一次部署。
 
-### 若卡在 “Initializing build environment”
+### 若卡在 “Initializing build environment” 或连 Build log 都不出来
 
-- 项目根目录已包含 **`.nvmrc`**（内容为 `20`），Cloudflare Pages 会据此使用 Node 20，多数情况下可避免卡住。
-- 若仍卡住，可在 **Settings → Environment variables** 中增加构建变量：
-  - **Name**: `NODE_VERSION`
-  - **Value**: `20`
-  - 勾选 **Production** 和 **Preview**。
-- 再在 **Deployments** 里对卡住的部署点 **Cancel**，然后 **Retry deployment**，或清空 **Build cache** 后重新部署。
-- 若使用 **Build system v2**，可尝试在 Dashboard 里切换到更新的构建系统（若有 “Upgrade” 或 v3 选项）。
+**现象**：部署一直停在 “Initializing build environment”，点进 Build 详情也没有任何 log。
+
+说明卡在**拉代码或准备环境**阶段，还没跑到 `npm install` / `npm run build`，所以不会有构建日志。
+
+**按顺序尝试：**
+
+1. **重新连接 Git**
+   - Cloudflare Dashboard → **Workers & Pages** → 你的项目 → **Settings** → **Builds & deployments**。
+   - 若提示重新授权或连接仓库，按提示**重新授权 GitHub/GitLab**，并确认该仓库的 Cloudflare Pages 应用未被停用（在 GitHub 的 Settings → Applications 里查看）。
+
+2. **指定 Node 版本（减少环境异常）**
+   - 项目里已有 **`.nvmrc`**（Node 20）。再在 **Settings → Environment variables** 里加一条**构建时**变量：
+     - **Name**: `NODE_VERSION`
+     - **Value**: `18` 或 `20`（若 20 仍卡，可先试 `18`）
+     - 勾选 **Production** 和 **Preview**。
+
+3. **清缓存并重试**
+   - **Deployments** → 找到卡住的那次部署 → **Cancel**。
+   - **Settings → Builds & deployments** 里如有 **Clear build cache**，点一次。
+   - 再 **Create deployment** 选当前分支，或推一个新的空提交触发部署。
+
+4. **看 Cloudflare 状态**
+   - 打开 [Cloudflare Status](https://www.cloudflarestatus.com/)，看 Pages / Builds 是否有故障。
+
+5. **仍不行时：用 Wrangler 本地构建再上传（绕过 Git 构建）**
+   - 本地执行：`npm ci && npm run build`，确认能正常生成 `dist/`。
+   - 安装并登录：`npm i -g wrangler`，`wrangler login`。
+   - 在项目根目录执行：
+     ```bash
+     wrangler pages deploy dist --project-name=你的Pages项目名
+     ```
+   - 这样不经过 Cloudflare 的 “Initializing build environment”，直接上传本地 `dist`，适合先让站点能访问，再慢慢排查 Git 构建。
 
 ## 3. 设置环境变量（重要）
 
