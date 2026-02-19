@@ -16,6 +16,16 @@
    - **Root directory**: 留空（项目根目录）
 4. 点击 **Save and Deploy** 先完成第一次部署。
 
+### 若卡在 “Initializing build environment”
+
+- 项目根目录已包含 **`.nvmrc`**（内容为 `20`），Cloudflare Pages 会据此使用 Node 20，多数情况下可避免卡住。
+- 若仍卡住，可在 **Settings → Environment variables** 中增加构建变量：
+  - **Name**: `NODE_VERSION`
+  - **Value**: `20`
+  - 勾选 **Production** 和 **Preview**。
+- 再在 **Deployments** 里对卡住的部署点 **Cancel**，然后 **Retry deployment**，或清空 **Build cache** 后重新部署。
+- 若使用 **Build system v2**，可尝试在 Dashboard 里切换到更新的构建系统（若有 “Upgrade” 或 v3 选项）。
+
 ## 3. 设置环境变量（重要）
 
 进入该 Pages 项目 → **Settings** → **Environment variables**，添加以下变量（建议同时勾选 **Production** 和 **Preview**）。
